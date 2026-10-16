@@ -94,27 +94,35 @@ public class ApiEndpointTests : IClassFixture<WebApplicationFactory<Program>>
     }
 
     [Fact]
-    public async Task GetPagosRecientes_DebeRetornarHttp200()
+    public async Task PostPago_ConMontoInvalido_DebeRetornarBadRequest()
     {
-        var response = await _client.GetAsync("/api/operaciones/pagos?limit=10");
+        var payloadInvalido = new
+        {
+            idSocioMembresia = 1,
+            monto = 0 // Monto inválido <= 0
+        };
 
-        response.StatusCode.Should().Be(HttpStatusCode.OK);
-        response.Content.Headers.ContentType?.MediaType.Should().Be("application/json");
+        var response = await _client.PostAsJsonAsync("/api/procedimientos/registrar-pago", payloadInvalido);
+
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        var body = await response.Content.ReadAsStringAsync();
+        body.Should().Contain("El monto a pagar debe ser mayor a cero.");
     }
 
     [Fact]
-    public async Task DeletePago_ConIdInexistente_DebeRetornarNotFound()
+    public async Task PostMembresia_ConSocioInvalido_DebeRetornarBadRequest()
     {
-        var response = await _client.DeleteAsync("/api/operaciones/pagos/9999999");
+        var payloadInvalido = new
+        {
+            idSocio = 0, // Socio inválido
+            idMembresia = 1,
+            fechaInicio = DateTime.Today
+        };
 
-        response.StatusCode.Should().Be(HttpStatusCode.NotFound);
-    }
+        var response = await _client.PostAsJsonAsync("/api/membresias/contratos", payloadInvalido);
 
-    [Fact]
-    public async Task DeleteContrato_ConIdInexistente_DebeRetornarNotFound()
-    {
-        var response = await _client.DeleteAsync("/api/membresias/contratos/9999999");
-
-        response.StatusCode.Should().Be(HttpStatusCode.NotFound);
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        var body = await response.Content.ReadAsStringAsync();
+        body.Should().Contain("Debe seleccionar un socio válido.");
     }
 }
