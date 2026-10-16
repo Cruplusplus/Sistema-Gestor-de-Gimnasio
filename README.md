@@ -98,6 +98,8 @@ El proyecto cuenta con una arquitectura moderna de grado empresarial, desacoplad
 
 ## Software de Gestión: `Gimnasio.Web` (C# .NET)
 
+<img width="1282" height="915" alt="image" src="https://github.com/user-attachments/assets/00c6f32b-1703-45a0-a19b-460cd44989e4" />
+
 La plataforma web fue diseñada con un enfoque comercial de **producto listo para cliente final**, ofreciendo una interfaz rápida, limpia y desacoplada bajo una arquitectura **Multi-Page Application (MPA)** con rutas amigables en ASP.NET Core (.NET 10) y micro-ORM **Dapper**.
 
 ### Demostración de Conocimiento en SQL y C# .NET Moderno
