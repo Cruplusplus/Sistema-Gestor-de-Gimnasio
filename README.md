@@ -55,11 +55,61 @@ El repositorio está modularizado en archivos independientes para facilitar el c
 
 ```text
 ├── 📄 README.md                    # Documentación y descripción del TPI
+├── 📄 Gimnasio.slnx                # Solución .NET
 ├── 📁 Creacion de la Base de Datos
-│   ├── 📜 Creacion de BBDD.sql          # Estructura de tablas y restricciones (DDL)
-│   ├── 📜 Insercion de Datos.sql            # Carga masiva de 10 socios, 10 empleados y 5 clases (DML)
-│   ├── 📜 Vistas.sql            # Definición de las 3 abstracciones de lectura
-│   ├── 📜 Procedimientos.sql     # Lógica programada transaccional y de reportes
-│   └── 📜 Triggers.sql          # Automatización logística de control de cupos
-└── 📁 Documentacion
-    └── 📄 TPI_Gimnasio_DER.png      # Diagrama de Entidad-Relación formal
+│   ├── 📜 Creacion de BBDD.sql     # Estructura de tablas y restricciones (DDL)
+│   ├── 📜 Insercion de Datos.sql   # Carga masiva de socios, empleados y clases (DML)
+│   ├── 📜 Vistas.sql               # Definición de las 3 abstracciones de lectura
+│   ├── 📜 Procedimientos.sql       # Lógica programada transaccional y de reportes
+│   └── 📜 Triggers.sql             # Automatización logística de control de cupos
+├── 📁 Documentacion
+│   ├── 📄 TPI - Base de Datos II - Grupo 17.pdf
+│   └── 📄 TPI_Gimnasio_DER.png     # Diagrama de Entidad-Relación formal
+└── 📁 src
+    └── 📁 Gimnasio.Web             # Aplicación Web ASP.NET Core & Dapper
+        ├── 📁 Data                 # Factoría de conexiones y repositorios de alto rendimiento
+        ├── 📁 Endpoints            # Minimal APIs RESTful
+        ├── 📁 Models               # Records y DTOs inmutables
+        └── 📁 wwwroot              # SPA interactiva (Tailwind CSS, Lucide Icons, Vanilla JS)
+```
+
+---
+
+## Entorno Web de Consultas: `Gimnasio.Web` (C# .NET)
+
+Para interactuar de forma intuitiva y visual con el motor de base de datos en Docker, se implementó una aplicación web moderna desarrollada en **ASP.NET Core (.NET 10)** y micro-ORM **Dapper**.
+
+### Demostración de Conocimiento en SQL y C# .NET Moderno
+
+1. **Acceso a Datos de Alto Rendimiento:**
+   - **Micro-ORM Dapper + ADO.NET (`Microsoft.Data.SqlClient`)**: Conexiones asincrónicas no bloqueantes (`await using`, `IAsyncDisposable`), consultas parametrizadas contra SQL Injection y mapeo directo a memoria de alta velocidad sin la sobrecarga de un ORM pesado.
+   - **Patrón Factory (`IDbConnectionFactory`)**: Desacopla la creación y configuración del connection pooling de SQL Server mediante Inyección de Dependencias.
+2. **C# Moderno (C# 12 / 13):**
+   - **Records inmutables** para DTOs de entrada y salida (`SocioMembresiaActivaDto`, `OcupacionClaseDto`, `RecaudacionMensualDto`, etc.).
+   - **Primary Constructors** y **Collection Expressions**.
+   - **Minimal APIs** agrupadas limpiamente mediante `RouteGroupBuilder` con Typed Results.
+3. **Manejo Estructurado de Excepciones SQL:**
+   - Captura precisa de excepciones `SqlException`, identificando números de error y mensajes de `RAISERROR` devueltos tanto por Stored Procedures como por Triggers (ej: validación de vacantes agotadas o contrato inexistente).
+4. **Módulos del Entorno Web:**
+   - 📊 **Dashboard & KPIs:** Monitoreo en vivo del servidor SQL en Docker (ping de conexión en milisegundos, conteo dinámico de socios, empleados, clases, contratos y recaudación acumulada).
+   - 👁️ **Vistas de Negocio:** Visualización interactiva de `vw_SociosMembresiasActivas` (con cálculo de días de gracia/morosidad), `vw_OcupacionClases` (con barras porcentuales de ocupación de salas) y `vw_RecaudacionMensual` (auditoría financiera).
+   - ⚡ **Procedimientos Almacenados:** Formularios para invocar `sp_ReporteAsistenciasSocio` (reporte con filtros de socio y fechas) y `sp_RegistrarPagoMembresia` (demostración de transacción ACID con `BEGIN TRAN`, `COMMIT` y captura de rollback).
+   - 🎯 **Laboratorio de Triggers en Tiempo Real:** Interfaz para inscribir y dar de baja socios en clases, observando cómo `trg_Inscripcion_ActualizarCupo` y `trg_Cancelacion_ActualizarCupo` actualizan el stock de vacantes en SQL Server de manera atómica, y visualizando la cancelación con `ROLLBACK` cuando no hay cupo.
+   - 🗃️ **Explorador de Tablas (Data Browser):** Navegador para consultar cualquiera de las 10 tablas base con paginación optimizada vía `OFFSET ... FETCH NEXT ROWS`.
+   - 💻 **SQL Studio Libre:** Consola para escribir y ejecutar sentencias SQL arbitrarias, midiendo el tiempo de respuesta del motor en ms y permitiendo exportar resultados a CSV.
+
+### Cómo Ejecutar la Aplicación Web
+
+1. Asegúrate de tener el contenedor de SQL Server corriendo:
+   ```bash
+   docker ps
+   # Nombre: SQLServer2025, puerto mapeado: 1433
+   ```
+2. Iniciar el servidor web de .NET:
+   ```bash
+   dotnet run --project src/Gimnasio.Web --urls "http://localhost:5150"
+   ```
+3. Abrir en cualquier navegador:
+   ```text
+   http://localhost:5150
+   ```

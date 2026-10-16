@@ -1,0 +1,587 @@
+<!DOCTYPE html>
+<html lang="es" class="h-full bg-slate-950 text-slate-100">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GimnasioDB • SQL & .NET Studio</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50: '#eef2ff',
+              100: '#e0e7ff',
+              500: '#6366f1',
+              600: '#4f46e5',
+              700: '#4338ca',
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <style>
+    /* Custom scrollbar */
+    ::-webkit-scrollbar { width: 8px; height: 8px; }
+    ::-webkit-scrollbar-track { background: #0f172a; }
+    ::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
+    ::-webkit-scrollbar-thumb:hover { background: #475569; }
+  </style>
+</head>
+<body class="min-h-full flex flex-col font-sans antialiased bg-slate-950 text-slate-100 selection:bg-indigo-500 selection:text-white">
+
+  <!-- Header -->
+  <header class="border-b border-slate-800 bg-slate-900/90 backdrop-blur sticky top-0 z-50">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <div class="h-10 w-10 rounded-xl bg-gradient-to-tr from-indigo-600 to-violet-500 flex items-center justify-center shadow-lg shadow-indigo-500/20 text-white font-black text-xl">
+          G
+        </div>
+        <div>
+          <div class="flex items-center gap-2">
+            <h1 class="text-lg font-bold tracking-tight text-white">GimnasioDB Studio</h1>
+            <span class="text-[10px] font-semibold tracking-wider uppercase px-2 py-0.5 rounded-full bg-indigo-500/10 text-indigo-400 border border-indigo-500/30">C# .NET 10 & SQL Server</span>
+          </div>
+          <p class="text-xs text-slate-400">UTN FRGP - TUP • Base de Datos II (Grupo 17)</p>
+        </div>
+      </div>
+
+      <!-- Health / Connection Pill -->
+      <div id="connectionStatus" class="flex items-center gap-2.5 px-3 py-1.5 rounded-full bg-slate-800/80 border border-slate-700 text-xs">
+        <span class="relative flex h-2.5 w-2.5">
+          <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+          <span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
+        </span>
+        <span class="text-slate-300 font-medium">Docker SQL Server</span>
+        <span id="dbLatencyBadge" class="text-slate-500 text-[11px] font-mono">-- ms</span>
+      </div>
+    </div>
+
+    <!-- Navigation Tabs -->
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 border-t border-slate-800/60 overflow-x-auto flex gap-1 py-1">
+      <button onclick="switchTab('dashboard')" id="tabBtn-dashboard" class="tab-btn flex items-center gap-2 px-3.5 py-2 text-xs font-medium rounded-lg transition-all text-white bg-indigo-600 shadow-sm">
+        <i data-lucide="layout-dashboard" class="w-4 h-4"></i> Dashboard & KPIs
+      </button>
+      <button onclick="switchTab('vistas')" id="tabBtn-vistas" class="tab-btn flex items-center gap-2 px-3.5 py-2 text-xs font-medium rounded-lg transition-all text-slate-400 hover:text-slate-200 hover:bg-slate-800">
+        <i data-lucide="eye" class="w-4 h-4"></i> Vistas de Negocio (3)
+      </button>
+      <button onclick="switchTab('procedimientos')" id="tabBtn-procedimientos" class="tab-btn flex items-center gap-2 px-3.5 py-2 text-xs font-medium rounded-lg transition-all text-slate-400 hover:text-slate-200 hover:bg-slate-800">
+        <i data-lucide="cpu" class="w-4 h-4"></i> Stored Procedures (2)
+      </button>
+      <button onclick="switchTab('triggers')" id="tabBtn-triggers" class="tab-btn flex items-center gap-2 px-3.5 py-2 text-xs font-medium rounded-lg transition-all text-slate-400 hover:text-slate-200 hover:bg-slate-800">
+        <i data-lucide="zap" class="w-4 h-4"></i> Triggers en Vivo (2)
+      </button>
+      <button onclick="switchTab('tablas')" id="tabBtn-tablas" class="tab-btn flex items-center gap-2 px-3.5 py-2 text-xs font-medium rounded-lg transition-all text-slate-400 hover:text-slate-200 hover:bg-slate-800">
+        <i data-lucide="database" class="w-4 h-4"></i> Explorador de Tablas (10)
+      </button>
+      <button onclick="switchTab('sqlstudio')" id="tabBtn-sqlstudio" class="tab-btn flex items-center gap-2 px-3.5 py-2 text-xs font-medium rounded-lg transition-all text-slate-400 hover:text-slate-200 hover:bg-slate-800">
+        <i data-lucide="terminal" class="w-4 h-4"></i> SQL Studio Libre
+      </button>
+    </div>
+  </header>
+
+  <!-- Main Content Container -->
+  <main class="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8 space-y-6">
+
+    <!-- TAB 1: DASHBOARD & KPIS -->
+    <section id="tab-dashboard" class="tab-content space-y-6">
+      <div class="flex items-center justify-between">
+        <div>
+          <h2 class="text-xl font-bold text-white tracking-tight">Panel de Estado y Rendimiento</h2>
+          <p class="text-sm text-slate-400">Monitoreo en tiempo real del motor SQL Server y métricas operativas del club</p>
+        </div>
+        <button onclick="loadDashboard()" class="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded-lg transition">
+          <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i> Actualizar Métricas
+        </button>
+      </div>
+
+      <!-- KPI Cards Grid -->
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+        <!-- Socios -->
+        <div class="bg-slate-900 border border-slate-800 p-4 rounded-xl shadow-sm hover:border-slate-700 transition">
+          <div class="flex items-center justify-between text-slate-400 mb-2">
+            <span class="text-xs font-medium">Socios Registrados</span>
+            <div class="p-2 rounded-lg bg-indigo-500/10 text-indigo-400">
+              <i data-lucide="users" class="w-4 h-4"></i>
+            </div>
+          </div>
+          <div id="kpi-socios" class="text-2xl font-bold text-white">--</div>
+          <span class="text-[11px] text-slate-500">Herencia unificada Personas</span>
+        </div>
+
+        <!-- Empleados -->
+        <div class="bg-slate-900 border border-slate-800 p-4 rounded-xl shadow-sm hover:border-slate-700 transition">
+          <div class="flex items-center justify-between text-slate-400 mb-2">
+            <span class="text-xs font-medium">Staff & Empleados</span>
+            <div class="p-2 rounded-lg bg-purple-500/10 text-purple-400">
+              <i data-lucide="briefcase" class="w-4 h-4"></i>
+            </div>
+          </div>
+          <div id="kpi-empleados" class="text-2xl font-bold text-white">--</div>
+          <span class="text-[11px] text-slate-500">Profesores, Limpieza, Recepción</span>
+        </div>
+
+        <!-- Clases -->
+        <div class="bg-slate-900 border border-slate-800 p-4 rounded-xl shadow-sm hover:border-slate-700 transition">
+          <div class="flex items-center justify-between text-slate-400 mb-2">
+            <span class="text-xs font-medium">Clases Programadas</span>
+            <div class="p-2 rounded-lg bg-emerald-500/10 text-emerald-400">
+              <i data-lucide="calendar" class="w-4 h-4"></i>
+            </div>
+          </div>
+          <div id="kpi-clases" class="text-2xl font-bold text-white">--</div>
+          <span class="text-[11px] text-slate-500">Control dinámico de cupos</span>
+        </div>
+
+        <!-- Membresias Activas -->
+        <div class="bg-slate-900 border border-slate-800 p-4 rounded-xl shadow-sm hover:border-slate-700 transition">
+          <div class="flex items-center justify-between text-slate-400 mb-2">
+            <span class="text-xs font-medium">Membresías Activas</span>
+            <div class="p-2 rounded-lg bg-amber-500/10 text-amber-400">
+              <i data-lucide="badge-check" class="w-4 h-4"></i>
+            </div>
+          </div>
+          <div id="kpi-membresias" class="text-2xl font-bold text-white">--</div>
+          <span class="text-[11px] text-slate-500">Contratos vigentes hoy</span>
+        </div>
+
+        <!-- Recaudación Total -->
+        <div class="bg-slate-900 border border-slate-800 p-4 rounded-xl shadow-sm hover:border-slate-700 transition">
+          <div class="flex items-center justify-between text-slate-400 mb-2">
+            <span class="text-xs font-medium">Recaudación Histórica</span>
+            <div class="p-2 rounded-lg bg-emerald-500/10 text-emerald-400">
+              <i data-lucide="dollar-sign" class="w-4 h-4"></i>
+            </div>
+          </div>
+          <div id="kpi-recaudacion" class="text-xl font-bold text-emerald-400 font-mono">--</div>
+          <span class="text-[11px] text-slate-500">Tipo MONEY en SQL</span>
+        </div>
+      </div>
+
+      <!-- System Architecture & Engine Details -->
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div class="bg-slate-900 border border-slate-800 p-5 rounded-xl space-y-4">
+          <h3 class="text-sm font-semibold text-white flex items-center gap-2">
+            <i data-lucide="server" class="w-4 h-4 text-indigo-400"></i> Motor y Conexión SQL Server
+          </h3>
+          <div class="space-y-3 text-xs">
+            <div class="flex justify-between border-b border-slate-800 pb-2">
+              <span class="text-slate-400">Versión del Motor:</span>
+              <span id="info-sql-version" class="text-slate-200 font-mono text-right">Consultando...</span>
+            </div>
+            <div class="flex justify-between border-b border-slate-800 pb-2">
+              <span class="text-slate-400">Contenedor Docker:</span>
+              <span class="text-slate-200 font-mono">SQLServer2025:1433</span>
+            </div>
+            <div class="flex justify-between border-b border-slate-800 pb-2">
+              <span class="text-slate-400">Driver de Acceso a Datos:</span>
+              <span class="text-indigo-400 font-semibold">Microsoft.Data.SqlClient + Dapper</span>
+            </div>
+            <div class="flex justify-between">
+              <span class="text-slate-400">Runtime .NET:</span>
+              <span class="text-slate-200 font-mono">.NET 10.0 (C# 13 High-Perf)</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="bg-slate-900 border border-slate-800 p-5 rounded-xl space-y-4 lg:col-span-2">
+          <h3 class="text-sm font-semibold text-white flex items-center gap-2">
+            <i data-lucide="layers" class="w-4 h-4 text-indigo-400"></i> Aspectos Técnicos del TPI implementados
+          </h3>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+            <div class="p-3 bg-slate-950/60 rounded-lg border border-slate-800/80">
+              <span class="font-semibold text-indigo-400 block mb-1">1. Normalización 3FN & Herencia</span>
+              <p class="text-slate-400 leading-relaxed">Tabla base <code>Personas</code> vinculada a <code>Socios</code> y <code>Empleados</code> mediante FK explícitas, evitando redundancias y duplicación de datos de contacto.</p>
+            </div>
+            <div class="p-3 bg-slate-950/60 rounded-lg border border-slate-800/80">
+              <span class="font-semibold text-indigo-400 block mb-1">2. Triggers DML con Atomicidad</span>
+              <p class="text-slate-400 leading-relaxed"><code>trg_Inscripcion_ActualizarCupo</code> decrementa cupos y cancela con <code>ROLLBACK</code> si el salón está lleno. <code>trg_Cancelacion_ActualizarCupo</code> devuelve la vacante.</p>
+            </div>
+            <div class="p-3 bg-slate-950/60 rounded-lg border border-slate-800/80">
+              <span class="font-semibold text-indigo-400 block mb-1">3. Transacciones ACID</span>
+              <p class="text-slate-400 leading-relaxed"><code>sp_RegistrarPagoMembresia</code> ejecuta bloques <code>BEGIN TRANSACTION / COMMIT / ROLLBACK</code> con control estructurado <code>TRY...CATCH</code> y <code>RAISERROR</code>.</p>
+            </div>
+            <div class="p-3 bg-slate-950/60 rounded-lg border border-slate-800/80">
+              <span class="font-semibold text-indigo-400 block mb-1">4. Acceso Eficiente en C#</span>
+              <p class="text-slate-400 leading-relaxed">Uso de Dapper con streaming asincrónico (<code>await using</code>, consultas parametrizadas contra inyecciones SQL y DTOs inmutables con Records).</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB 2: VISTAS DE NEGOCIO -->
+    <section id="tab-vistas" class="tab-content hidden space-y-6">
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h2 class="text-xl font-bold text-white tracking-tight">Vistas Complejas de Base de Datos</h2>
+          <p class="text-sm text-slate-400">Abstracciones analíticas y operativas definidas en SQL Server</p>
+        </div>
+        <!-- Select view pill buttons -->
+        <div class="flex bg-slate-900 p-1 rounded-xl border border-slate-800 gap-1 text-xs">
+          <button onclick="loadView('socios-membresias-activas')" id="subviewBtn-socios-membresias-activas" class="px-3 py-1.5 rounded-lg font-medium text-white bg-indigo-600 transition">
+            Socios Activos
+          </button>
+          <button onclick="loadView('ocupacion-clases')" id="subviewBtn-ocupacion-clases" class="px-3 py-1.5 rounded-lg font-medium text-slate-400 hover:text-white transition">
+            Ocupación de Clases
+          </button>
+          <button onclick="loadView('recaudacion-mensual')" id="subviewBtn-recaudacion-mensual" class="px-3 py-1.5 rounded-lg font-medium text-slate-400 hover:text-white transition">
+            Recaudación Mensual
+          </button>
+        </div>
+      </div>
+
+      <!-- View Description Banner -->
+      <div id="viewDescriptionBanner" class="p-4 rounded-xl bg-slate-900 border border-slate-800 flex items-start gap-3">
+        <i data-lucide="info" class="w-5 h-5 text-indigo-400 mt-0.5 shrink-0"></i>
+        <div class="text-xs">
+          <span id="viewTitle" class="font-bold text-white text-sm block mb-0.5">vw_SociosMembresiasActivas</span>
+          <p id="viewDescription" class="text-slate-400">Reporte de socios con contratos vigentes, calculando matemáticamente los días restantes hasta el vencimiento.</p>
+        </div>
+      </div>
+
+      <!-- Table Container -->
+      <div class="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden shadow-sm">
+        <div class="p-3 border-b border-slate-800 flex items-center justify-between text-xs text-slate-400">
+          <span id="viewRowCount">Cargando registros...</span>
+          <span id="viewExecTime" class="font-mono text-indigo-400"></span>
+        </div>
+        <div class="overflow-x-auto">
+          <table class="w-full text-left text-xs text-slate-300">
+            <thead id="viewTableHead" class="bg-slate-950/70 uppercase tracking-wider text-[11px] text-slate-400 border-b border-slate-800">
+              <!-- Rendered via JS -->
+            </thead>
+            <tbody id="viewTableBody" class="divide-y divide-slate-800/60 font-sans">
+              <!-- Rendered via JS -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB 3: PROCEDIMIENTOS ALMACENADOS -->
+    <section id="tab-procedimientos" class="tab-content hidden space-y-6">
+      <div>
+        <h2 class="text-xl font-bold text-white tracking-tight">Procedimientos Almacenados</h2>
+        <p class="text-sm text-slate-400">Ejecución parametrizada y transaccional con manejo de errores y atomicidad</p>
+      </div>
+
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <!-- Procedimiento 1: Reporte Parametrizado -->
+        <div class="bg-slate-900 border border-slate-800 rounded-xl p-5 space-y-4">
+          <div class="border-b border-slate-800 pb-3">
+            <div class="flex items-center gap-2">
+              <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-indigo-500/20 text-indigo-400 border border-indigo-500/30">REPORT PROCEDURE</span>
+              <h3 class="font-bold text-white text-sm">sp_ReporteAsistenciasSocio</h3>
+            </div>
+            <p class="text-xs text-slate-400 mt-1">Extrae de forma ordenada el presentismo e inasistencias de un socio dentro de un rango de fechas.</p>
+          </div>
+
+          <form id="formReporteAsistencias" onsubmit="runSpAsistencias(event)" class="space-y-3 text-xs">
+            <div>
+              <label class="block text-slate-300 font-medium mb-1">Seleccionar Socio:</label>
+              <select id="spSocioSelect" required class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-slate-200 focus:outline-none focus:border-indigo-500">
+                <option value="">Cargando socios...</option>
+              </select>
+            </div>
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <label class="block text-slate-300 font-medium mb-1">Fecha Desde:</label>
+                <input type="date" id="spFechaDesde" required class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-slate-200 focus:outline-none focus:border-indigo-500">
+              </div>
+              <div>
+                <label class="block text-slate-300 font-medium mb-1">Fecha Hasta:</label>
+                <input type="date" id="spFechaHasta" required class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-slate-200 focus:outline-none focus:border-indigo-500">
+              </div>
+            </div>
+            <button type="submit" class="w-full py-2 bg-indigo-600 hover:bg-indigo-500 text-white font-medium rounded-lg transition flex items-center justify-center gap-2">
+              <i data-lucide="search" class="w-4 h-4"></i> Consultar Asistencias
+            </button>
+          </form>
+
+          <!-- Asistencias Results Box -->
+          <div id="spAsistenciasResults" class="space-y-2 mt-4 hidden">
+            <h4 class="text-xs font-semibold text-slate-300">Historial Registrado:</h4>
+            <div class="max-h-60 overflow-y-auto border border-slate-800 rounded-lg">
+              <table class="w-full text-left text-xs text-slate-300">
+                <thead class="bg-slate-950 text-slate-400 border-b border-slate-800 sticky top-0">
+                  <tr>
+                    <th class="p-2">Fecha</th>
+                    <th class="p-2">Clase</th>
+                    <th class="p-2">Horario</th>
+                    <th class="p-2">Estado</th>
+                  </tr>
+                </thead>
+                <tbody id="spAsistenciasBody" class="divide-y divide-slate-800"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- Procedimiento 2: Acción Transaccional de Pagos -->
+        <div class="bg-slate-900 border border-slate-800 rounded-xl p-5 space-y-4">
+          <div class="border-b border-slate-800 pb-3">
+            <div class="flex items-center gap-2">
+              <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">TRANSACTIONAL PROCEDURE</span>
+              <h3 class="font-bold text-white text-sm">sp_RegistrarPagoMembresia</h3>
+            </div>
+            <p class="text-xs text-slate-400 mt-1">Registra cobro bajo transacción ACID (<code>BEGIN TRAN / COMMIT / ROLLBACK</code>) y activa el contrato.</p>
+          </div>
+
+          <form id="formRegistrarPago" onsubmit="runSpRegistrarPago(event)" class="space-y-3 text-xs">
+            <div>
+              <label class="block text-slate-300 font-medium mb-1">Contrato Socio-Membresía:</label>
+              <select id="spContratoSelect" required class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-slate-200 focus:outline-none focus:border-indigo-500">
+                <option value="">Cargando contratos...</option>
+              </select>
+            </div>
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <label class="block text-slate-300 font-medium mb-1">Monto ($ MONEY):</label>
+                <input type="number" id="spPagoMonto" step="0.01" min="1" placeholder="Ej: 30000.00" required class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-slate-200 focus:outline-none focus:border-indigo-500">
+              </div>
+              <div>
+                <label class="block text-slate-300 font-medium mb-1">Fecha de Cobro:</label>
+                <input type="datetime-local" id="spPagoFecha" required class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-slate-200 focus:outline-none focus:border-indigo-500">
+              </div>
+            </div>
+            <button type="submit" class="w-full py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-medium rounded-lg transition flex items-center justify-center gap-2">
+              <i data-lucide="check-circle" class="w-4 h-4"></i> Procesar Pago Transaccional
+            </button>
+          </form>
+
+          <!-- Mensaje de Resultado Transaccional -->
+          <div id="spPagoStatus" class="hidden p-3 rounded-lg text-xs border"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB 4: LABORATIO DE TRIGGERS (CUPOS EN VIVO) -->
+    <section id="tab-triggers" class="tab-content hidden space-y-6">
+      <div>
+        <h2 class="text-xl font-bold text-white tracking-tight">Laboratorio de Triggers en Tiempo Real</h2>
+        <p class="text-sm text-slate-400">Demostración práctica de los disparadores de control de vacantes sobre la tabla <code>Clases</code></p>
+      </div>
+
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <!-- Formulario de Inscripción / Prueba de Triggers -->
+        <div class="bg-slate-900 border border-slate-800 rounded-xl p-5 space-y-4">
+          <div class="border-b border-slate-800 pb-2">
+            <h3 class="font-bold text-white text-sm flex items-center gap-2">
+              <i data-lucide="user-plus" class="w-4 h-4 text-indigo-400"></i> Inscribir Alumno a Clase
+            </h3>
+            <p class="text-[11px] text-slate-400">Dispara <code>trg_Inscripcion_ActualizarCupo</code> (AFTER INSERT)</p>
+          </div>
+
+          <form id="formInscribirTrigger" onsubmit="runInscripcionTrigger(event)" class="space-y-3 text-xs">
+            <div>
+              <label class="block text-slate-300 font-medium mb-1">Socio:</label>
+              <select id="triggerSocioSelect" required class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-slate-200 focus:outline-none focus:border-indigo-500">
+                <option value="">Cargando socios...</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-slate-300 font-medium mb-1">Clase y Vacantes:</label>
+              <select id="triggerClaseSelect" required class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-slate-200 focus:outline-none focus:border-indigo-500">
+                <option value="">Cargando clases...</option>
+              </select>
+            </div>
+            <button type="submit" class="w-full py-2 bg-indigo-600 hover:bg-indigo-500 text-white font-medium rounded-lg transition flex items-center justify-center gap-2">
+              <i data-lucide="check" class="w-4 h-4"></i> Inscribir (Descuenta Cupo)
+            </button>
+          </form>
+
+          <!-- Trigger Feedback Box -->
+          <div id="triggerResultAlert" class="hidden p-3 rounded-lg text-xs border"></div>
+
+          <!-- Documentation note -->
+          <div class="p-3 bg-slate-950/80 rounded-lg border border-slate-800 text-[11px] text-slate-400 space-y-1">
+            <span class="font-bold text-amber-400 block flex items-center gap-1">
+              <i data-lucide="alert-triangle" class="w-3.5 h-3.5"></i> Comportamiento del Trigger:
+            </span>
+            <p>Si el cupo disponible es <code>&lt;= 0</code>, el trigger ejecuta <code>RAISERROR</code> y <code>ROLLBACK TRANSACTION</code>, evitando la sobreventa física del salón.</p>
+          </div>
+        </div>
+
+        <!-- Lista de Clases y Cupos en Vivo -->
+        <div class="bg-slate-900 border border-slate-800 rounded-xl p-5 space-y-4 lg:col-span-2">
+          <div class="flex items-center justify-between border-b border-slate-800 pb-2">
+            <div>
+              <h3 class="font-bold text-white text-sm flex items-center gap-2">
+                <i data-lucide="gauge" class="w-4 h-4 text-emerald-400"></i> Estado Actual de Cupos de Clases
+              </h3>
+              <p class="text-[11px] text-slate-400">Actualizado automáticamente en cada insert/delete</p>
+            </div>
+            <button onclick="loadClasesCatalog()" class="p-1.5 hover:bg-slate-800 rounded-lg text-slate-400 hover:text-white transition">
+              <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>
+            </button>
+          </div>
+
+          <div id="clasesCuposCards" class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <!-- Rendered via JS -->
+          </div>
+
+          <!-- Tabla de Inscripciones Recientes con botón de Cancelar (Devolver Cupo) -->
+          <div class="mt-4 pt-3 border-t border-slate-800 space-y-2">
+            <div class="flex items-center justify-between">
+              <h4 class="text-xs font-semibold text-slate-300 flex items-center gap-1.5">
+                <i data-lucide="list" class="w-3.5 h-3.5 text-indigo-400"></i> Inscripciones Registradas (Probar Cancelación)
+              </h4>
+              <span class="text-[10px] text-slate-500">trg_Cancelacion_ActualizarCupo (AFTER DELETE)</span>
+            </div>
+            <div class="max-h-48 overflow-y-auto border border-slate-800 rounded-lg">
+              <table class="w-full text-left text-xs text-slate-300">
+                <thead class="bg-slate-950 text-slate-400 sticky top-0 border-b border-slate-800">
+                  <tr>
+                    <th class="p-2">ID</th>
+                    <th class="p-2">Socio</th>
+                    <th class="p-2">Clase</th>
+                    <th class="p-2">Fecha</th>
+                    <th class="p-2 text-right">Acción</th>
+                  </tr>
+                </thead>
+                <tbody id="inscripcionesListBody" class="divide-y divide-slate-800/80"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB 5: EXPLORADOR DE TABLAS (DATA BROWSER) -->
+    <section id="tab-tablas" class="tab-content hidden space-y-6">
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h2 class="text-xl font-bold text-white tracking-tight">Explorador de Tablas del Modelo</h2>
+          <p class="text-sm text-slate-400">Visualiza cualquier tabla física con paginación optimizada</p>
+        </div>
+        <!-- Select Table Dropdown -->
+        <div class="flex items-center gap-2">
+          <label class="text-xs text-slate-400 font-medium">Tabla:</label>
+          <select id="tablesSelect" onchange="selectTable(this.value)" class="bg-slate-900 border border-slate-700 text-slate-200 text-xs rounded-lg px-3 py-1.5 focus:outline-none focus:border-indigo-500">
+            <!-- Rendered via JS -->
+          </select>
+        </div>
+      </div>
+
+      <!-- Data Table View -->
+      <div class="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden shadow-sm">
+        <div class="p-3 border-b border-slate-800 flex items-center justify-between text-xs text-slate-400">
+          <span id="tableInfoBadge">Cargando datos...</span>
+          <div class="flex items-center gap-2">
+            <button id="btnPrevPage" onclick="changePage(-1)" class="px-2 py-1 bg-slate-800 hover:bg-slate-700 rounded text-slate-200 disabled:opacity-40">Anterior</button>
+            <span id="pageIndicator" class="font-mono">Pág 1</span>
+            <button id="btnNextPage" onclick="changePage(1)" class="px-2 py-1 bg-slate-800 hover:bg-slate-700 rounded text-slate-200 disabled:opacity-40">Siguiente</button>
+          </div>
+        </div>
+        <div class="overflow-x-auto">
+          <table class="w-full text-left text-xs text-slate-300">
+            <thead id="browserTableHead" class="bg-slate-950 uppercase tracking-wider text-[11px] text-slate-400 border-b border-slate-800"></thead>
+            <tbody id="browserTableBody" class="divide-y divide-slate-800 font-mono"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB 6: SQL STUDIO LIBRE -->
+    <section id="tab-sqlstudio" class="tab-content hidden space-y-6">
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h2 class="text-xl font-bold text-white tracking-tight">SQL Studio & Query Playground</h2>
+          <p class="text-sm text-slate-400">Escribe y ejecuta consultas SQL directamente contra SQL Server midiendo tiempos de respuesta en .NET</p>
+        </div>
+      </div>
+
+      <!-- Quick query templates -->
+      <div class="flex flex-wrap gap-2 text-xs">
+        <span class="text-slate-500 py-1 font-medium">Plantillas de consulta:</span>
+        <button onclick="setQueryTemplate('topSocios')" class="px-2.5 py-1 rounded bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-300 transition">
+          Top Socios con más Pagos
+        </button>
+        <button onclick="setQueryTemplate('clasesOcupadas')" class="px-2.5 py-1 rounded bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-300 transition">
+          Clases con Cupo Crítico (&lt;= 5)
+        </button>
+        <button onclick="setQueryTemplate('staffProfesores')" class="px-2.5 py-1 rounded bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-300 transition">
+          Staff con Clases Asignadas
+        </button>
+        <button onclick="setQueryTemplate('asistenciasGlobales')" class="px-2.5 py-1 rounded bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-300 transition">
+          Resumen de Asistencias por Clase
+        </button>
+      </div>
+
+      <!-- Query Editor Box -->
+      <div class="bg-slate-900 border border-slate-800 rounded-xl p-4 space-y-3">
+        <div class="flex items-center justify-between text-xs text-slate-400 border-b border-slate-800 pb-2">
+          <span class="flex items-center gap-1.5 font-mono">
+            <i data-lucide="code" class="w-3.5 h-3.5 text-indigo-400"></i> T-SQL Query Editor
+          </span>
+          <span class="text-[11px] text-slate-500">Ejecutar: Ctrl + Enter</span>
+        </div>
+        <textarea id="sqlQueryInput" rows="6" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-3 text-slate-100 font-mono text-xs focus:outline-none focus:border-indigo-500 resize-y leading-relaxed" placeholder="Escribe tu consulta SQL aquí... ej: SELECT * FROM Personas;"></textarea>
+        
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-2 text-xs text-slate-400">
+            <span>Máximo de filas:</span>
+            <select id="sqlMaxRows" class="bg-slate-950 border border-slate-800 text-slate-300 rounded px-2 py-1 focus:outline-none">
+              <option value="50">50</option>
+              <option value="200" selected>200</option>
+              <option value="500">500</option>
+            </select>
+          </div>
+          <div class="flex items-center gap-2">
+            <button onclick="exportSqlResultsToCsv()" id="btnExportCsv" class="hidden px-3 py-1.5 text-xs font-medium rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition flex items-center gap-1.5">
+              <i data-lucide="download" class="w-3.5 h-3.5"></i> Exportar CSV
+            </button>
+            <button onclick="executeSqlQuery()" id="btnExecuteSql" class="px-4 py-2 text-xs font-semibold rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white transition flex items-center gap-2 shadow-sm">
+              <i data-lucide="play" class="w-4 h-4 fill-current"></i> Ejecutar Consulta
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- SQL Results Box -->
+      <div id="sqlResultsContainer" class="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden shadow-sm hidden">
+        <div class="p-3 border-b border-slate-800 flex items-center justify-between text-xs text-slate-400">
+          <div class="flex items-center gap-3">
+            <span id="sqlRowCount" class="font-medium text-slate-300">0 filas obtenidas</span>
+            <span id="sqlExecutionTime" class="font-mono text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">-- ms</span>
+          </div>
+          <span id="sqlTruncatedNote" class="text-[11px] text-amber-400 hidden">Límite alcanzado</span>
+        </div>
+        <div class="overflow-x-auto max-h-96">
+          <table class="w-full text-left text-xs text-slate-300">
+            <thead id="sqlResultHead" class="bg-slate-950 uppercase tracking-wider text-[11px] text-slate-400 border-b border-slate-800 sticky top-0"></thead>
+            <tbody id="sqlResultBody" class="divide-y divide-slate-800 font-mono"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- SQL Error Box -->
+      <div id="sqlErrorBox" class="hidden p-4 rounded-xl bg-rose-950/40 border border-rose-800/80 text-rose-200 text-xs space-y-1">
+        <div class="flex items-center gap-2 font-bold text-rose-400">
+          <i data-lucide="alert-octagon" class="w-4 h-4"></i> Error de SQL Server:
+        </div>
+        <p id="sqlErrorMessage" class="font-mono"></p>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Footer -->
+  <footer class="border-t border-slate-800/80 bg-slate-950 py-4 text-center text-xs text-slate-500">
+    <div class="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-2">
+      <div>GimnasioDB • TPI Base de Datos II (UTN FRGP) — Grupo 17</div>
+      <div class="font-mono text-slate-600 text-[11px]">ASP.NET Core Web API • Dapper • SQL Server 2025</div>
+    </div>
+  </footer>
+
+  <!-- App Script -->
+  <script src="/app.js"></script>
+</body>
+</html>
