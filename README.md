@@ -149,3 +149,13 @@ Una vez levantado, accede directamente a: `http://localhost:5150`
    - Operaciones & Clases: `http://localhost:5150/operaciones`
    - SQL Studio & Tablas: `http://localhost:5150/studio`
    - Documentación Scalar API: `http://localhost:5150/scalar/v1`
+
+---
+
+## 📜 Licencia y Uso Comercial
+
+Este proyecto se distribuye bajo la licencia **[PolyForm Noncommercial License 1.0.0](LICENSE)**.
+
+* **Uso Permitido:** Libre inspección de código, clonación con fines de estudio/académicos, ejecución en entornos locales de prueba y evaluación técnica como muestra de portafolio profesional.
+* **Restricción Comercial:** Queda **estrictamente prohibida** la explotación comercial, venta, sublicenciamiento o despliegue en entornos de producción con fines de lucro sin una licencia comercial previa otorgada por el autor.
+* **Contacto para Licencias Comerciales:** Para adquirir una licencia comercial, soporte o contrataciones para implementación en gimnasios y clubes, contactar a [juancruzdominguez7@gmail.com](mailto:juancruzdominguez7@gmail.com).
