@@ -6,6 +6,10 @@
 # dotenv files
 .env
 
+# dev agents and memory
+memory.md
+agents.md
+
 # User-specific files
 *.rsuser
 *.suo
