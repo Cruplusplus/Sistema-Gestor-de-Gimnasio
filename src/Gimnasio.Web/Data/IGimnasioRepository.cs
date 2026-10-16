@@ -19,4 +19,9 @@ public interface IGimnasioRepository
     Task<IEnumerable<TableSummaryDto>> GetTablesSummaryAsync(CancellationToken ct = default);
     Task<TableDataResult> GetTableDataAsync(string tableName, int page = 1, int pageSize = 20, CancellationToken ct = default);
     Task<DynamicQueryResult> ExecuteDynamicSqlAsync(string sql, int maxRows = 200, CancellationToken ct = default);
+    Task<IEnumerable<PersonaListItemDto>> GetPersonasAsync(string? busqueda = null, string? tipo = null, CancellationToken ct = default);
+    Task<long> CrearPersonaAsync(CrearPersonaRequest request, CancellationToken ct = default);
+    Task<bool> ToggleActivoPersonaAsync(long personaId, CancellationToken ct = default);
+    Task EliminarPersonaAsync(long personaId, CancellationToken ct = default);
+    Task<IEnumerable<RolDto>> GetRolesCatalogAsync(CancellationToken ct = default);
 }

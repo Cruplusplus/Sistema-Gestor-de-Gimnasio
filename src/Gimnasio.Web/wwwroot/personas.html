@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="es" class="h-full bg-slate-950 text-slate-100">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Gestión de Personas • GimnasioDB</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <style>
+    ::-webkit-scrollbar { width: 8px; height: 8px; }
+    ::-webkit-scrollbar-track { background: #0f172a; }
+    ::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
+    ::-webkit-scrollbar-thumb:hover { background: #475569; }
+  </style>
+</head>
+<body class="min-h-full flex flex-col font-sans antialiased bg-slate-950 text-slate-100 selection:bg-indigo-500 selection:text-white">
+
+  <!-- Shared Header -->
+  <div id="shared-header"></div>
+
+  <!-- Main Content -->
+  <main class="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8 space-y-6">
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div>
+        <h2 class="text-xl font-bold text-white tracking-tight">Directorio de Personas</h2>
+        <p class="text-sm text-slate-400">Administración unificada de socios y personal del club con soporte de perfiles</p>
+      </div>
+      <button onclick="toggleFormPersona()" id="btnToggleFormPersona" class="flex items-center gap-2 px-4 py-2 text-xs font-semibold rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white transition shadow-sm self-start sm:self-auto">
+        <i data-lucide="user-plus" class="w-4 h-4"></i> <span id="btnToggleFormPersonaText">Registrar Nueva Persona</span>
+      </button>
+    </div>
+
+    <!-- Collapsible Registration Form -->
+    <div id="formNuevaPersonaContainer" class="hidden bg-slate-900 border border-indigo-500/30 rounded-xl p-5 space-y-4 shadow-lg shadow-indigo-500/5">
+      <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+        <div>
+          <h3 class="font-bold text-white text-sm flex items-center gap-2">
+            <i data-lucide="user-plus" class="w-4 h-4 text-indigo-400"></i> Alta de Nueva Persona
+          </h3>
+          <p class="text-xs text-slate-400 mt-0.5">Ingresa los datos personales y clasifícala como socio, empleado o ambos.</p>
+        </div>
+        <button onclick="toggleFormPersona(false)" class="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800">
+          <i data-lucide="x" class="w-4 h-4"></i>
+        </button>
+      </div>
+
+      <form id="formCrearPersona" onsubmit="guardarNuevaPersona(event)" class="space-y-4 text-xs">
+        <!-- Datos Personales -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+          <div>
+            <label class="block text-slate-300 font-medium mb-1">Nombre *</label>
+            <input type="text" id="personaNombre" required placeholder="Ej: Marcos" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-slate-200 focus:outline-none focus:border-indigo-500">
+          </div>
+          <div>
+            <label class="block text-slate-300 font-medium mb-1">Apellido *</label>
+            <input type="text" id="personaApellido" required placeholder="Ej: Benítez" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-slate-200 focus:outline-none focus:border-indigo-500">
+          </div>
+          <div>
+            <label class="block text-slate-300 font-medium mb-1">Email *</label>
+            <input type="email" id="personaEmail" required placeholder="marcos.b@email.com" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-slate-200 focus:outline-none focus:border-indigo-500">
+          </div>
+          <div>
+            <label class="block text-slate-300 font-medium mb-1">Teléfono</label>
+            <input type="tel" id="personaTelefono" placeholder="1122334455" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-slate-200 focus:outline-none focus:border-indigo-500">
+          </div>
+          <div>
+            <label class="block text-slate-300 font-medium mb-1">Fecha de Nacimiento *</label>
+            <input type="date" id="personaFechaNac" required class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-slate-200 focus:outline-none focus:border-indigo-500">
+          </div>
+        </div>
+
+        <!-- Clasificación / Herencia -->
+        <div class="border-t border-slate-800 pt-3 space-y-3">
+          <span class="text-xs font-semibold text-slate-300 block">Perfil y Roles en el Club:</span>
+          
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <!-- Socio Checkbox Card -->
+            <div class="p-3 bg-slate-950 border border-slate-800 rounded-xl space-y-3">
+              <label class="flex items-center gap-2.5 cursor-pointer">
+                <input type="checkbox" id="checkEsSocio" onchange="toggleSocioFields(this.checked)" checked class="h-4 w-4 rounded bg-slate-900 border-slate-700 text-indigo-600 focus:ring-0">
+                <div>
+                  <span class="font-medium text-white block">Registrar como Socio</span>
+                  <span class="text-[11px] text-slate-500">Permite contratar membresías y anotarse a clases</span>
+                </div>
+              </label>
+              <div id="socioFieldsContainer" class="pt-2 border-t border-slate-800/80">
+                <label class="block text-slate-400 text-[11px] mb-1">Fecha de Registro:</label>
+                <input type="date" id="socioFechaRegistro" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-slate-200 focus:outline-none focus:border-indigo-500 text-xs">
+              </div>
+            </div>
+
+            <!-- Empleado Checkbox Card -->
+            <div class="p-3 bg-slate-950 border border-slate-800 rounded-xl space-y-3">
+              <label class="flex items-center gap-2.5 cursor-pointer">
+                <input type="checkbox" id="checkEsEmpleado" onchange="toggleEmpleadoFields(this.checked)" class="h-4 w-4 rounded bg-slate-900 border-slate-700 text-indigo-600 focus:ring-0">
+                <div>
+                  <span class="font-medium text-white block">Registrar como Personal / Empleado</span>
+                  <span class="text-[11px] text-slate-500">Forma parte del staff con un rol asignado</span>
+                </div>
+              </label>
+              <div id="empleadoFieldsContainer" class="hidden pt-2 border-t border-slate-800/80 space-y-2">
+                <div>
+                  <label class="block text-slate-400 text-[11px] mb-1">Rol / Cargo *</label>
+                  <select id="empleadoRolSelect" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-slate-200 focus:outline-none focus:border-indigo-500 text-xs">
+                    <option value="">Cargando roles...</option>
+                  </select>
+                </div>
+                <div>
+                  <label class="block text-slate-400 text-[11px] mb-1">Fecha de Contratación:</label>
+                  <input type="date" id="empleadoFechaContratacion" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-slate-200 focus:outline-none focus:border-indigo-500 text-xs">
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Botones de Acción -->
+        <div class="flex items-center justify-end gap-3 pt-2">
+          <button type="button" onclick="toggleFormPersona(false)" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg font-medium transition">
+            Cancelar
+          </button>
+          <button type="submit" id="btnGuardarPersona" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white font-medium rounded-lg transition flex items-center gap-2">
+            <i data-lucide="check" class="w-4 h-4"></i> Guardar Persona
+          </button>
+        </div>
+      </form>
+
+      <div id="personaFormStatusAlert" class="hidden p-3 rounded-lg text-xs border"></div>
+    </div>
+
+    <!-- Filter and Search Bar -->
+    <div class="flex flex-col sm:flex-row items-center justify-between gap-3 bg-slate-900 border border-slate-800 p-3 rounded-xl text-xs">
+      <div class="relative w-full sm:w-80">
+        <i data-lucide="search" class="w-4 h-4 text-slate-500 absolute left-3 top-2.5"></i>
+        <input type="text" id="personasSearchInput" oninput="debounceBuscarPersonas()" placeholder="Buscar por nombre, email o teléfono..." class="w-full bg-slate-950 border border-slate-700 rounded-lg pl-9 pr-3 py-2 text-slate-200 focus:outline-none focus:border-indigo-500">
+      </div>
+      <div class="flex items-center gap-2 w-full sm:w-auto">
+        <label class="text-slate-400 font-medium shrink-0">Filtrar:</label>
+        <select id="personasTipoFilter" onchange="loadPersonas()" class="w-full sm:w-auto bg-slate-950 border border-slate-700 text-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:border-indigo-500">
+          <option value="">Todos los perfiles</option>
+          <option value="socio">Solo Socios</option>
+          <option value="empleado">Solo Empleados / Staff</option>
+          <option value="mixto">Socio y Empleado (Mixto)</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- Table of Personas -->
+    <div class="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden shadow-sm">
+      <div class="p-3 border-b border-slate-800 flex items-center justify-between text-xs text-slate-400">
+        <span id="personasCountBadge">Cargando personas...</span>
+        <button onclick="loadPersonas()" class="hover:text-white p-1 rounded transition" title="Refrescar lista">
+          <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>
+        </button>
+      </div>
+      <div class="overflow-x-auto">
+        <table class="w-full text-left text-xs text-slate-300">
+          <thead class="bg-slate-950 uppercase tracking-wider text-[11px] text-slate-400 border-b border-slate-800">
+            <tr>
+              <th class="p-3">ID</th>
+              <th class="p-3">Nombre y Apellido</th>
+              <th class="p-3">Contacto</th>
+              <th class="p-3">Perfil / Cargo</th>
+              <th class="p-3">F. Nacimiento</th>
+              <th class="p-3">Estado</th>
+              <th class="p-3 text-right">Acciones</th>
+            </tr>
+          </thead>
+          <tbody id="personasTableBody" class="divide-y divide-slate-800/70 font-sans">
+            <!-- Rendered via JS -->
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </main>
+
+  <!-- Shared Footer -->
+  <div id="shared-footer"></div>
+
+  <!-- Scripts -->
+  <script src="/js/shared.js"></script>
+  <script src="/js/personas.js"></script>
+</body>
+</html>

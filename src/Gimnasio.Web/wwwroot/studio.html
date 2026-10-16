@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="es" class="h-full bg-slate-950 text-slate-100">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SQL Studio & Tablas • GimnasioDB</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <style>
+    ::-webkit-scrollbar { width: 8px; height: 8px; }
+    ::-webkit-scrollbar-track { background: #0f172a; }
+    ::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
+    ::-webkit-scrollbar-thumb:hover { background: #475569; }
+  </style>
+</head>
+<body class="min-h-full flex flex-col font-sans antialiased bg-slate-950 text-slate-100 selection:bg-indigo-500 selection:text-white">
+
+  <!-- Shared Header -->
+  <div id="shared-header"></div>
+
+  <!-- Main Content -->
+  <main class="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8 space-y-6">
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div>
+        <h2 class="text-xl font-bold text-white tracking-tight">Herramientas de Base de Datos</h2>
+        <p class="text-sm text-slate-400">Consola de consultas libres y visor de tablas físicas de SQL Server</p>
+      </div>
+
+      <!-- Studio Mode Switcher -->
+      <div class="flex bg-slate-900 p-1 rounded-xl border border-slate-800 gap-1 text-xs">
+        <button onclick="switchStudioMode('sql')" id="studioBtn-sql" class="px-3.5 py-1.5 rounded-lg font-medium text-white bg-indigo-600 transition flex items-center gap-1.5">
+          <i data-lucide="terminal" class="w-3.5 h-3.5"></i> SQL Studio Libre
+        </button>
+        <button onclick="switchStudioMode('tablas')" id="studioBtn-tablas" class="px-3.5 py-1.5 rounded-lg font-medium text-slate-400 hover:text-white transition flex items-center gap-1.5">
+          <i data-lucide="database" class="w-3.5 h-3.5"></i> Explorador de Tablas (10)
+        </button>
+      </div>
+    </div>
+
+    <!-- SECTION 1: SQL STUDIO LIBRE -->
+    <section id="studioSection-sql" class="space-y-6">
+      <!-- Quick query templates -->
+      <div class="flex flex-wrap gap-2 text-xs">
+        <span class="text-slate-500 py-1 font-medium">Plantillas de consulta:</span>
+        <button onclick="setQueryTemplate('topSocios')" class="px-2.5 py-1 rounded bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-300 transition">
+          Top Socios con más Pagos
+        </button>
+        <button onclick="setQueryTemplate('clasesOcupadas')" class="px-2.5 py-1 rounded bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-300 transition">
+          Clases con Cupo Crítico (&lt;= 5)
+        </button>
+        <button onclick="setQueryTemplate('staffProfesores')" class="px-2.5 py-1 rounded bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-300 transition">
+          Staff con Clases Asignadas
+        </button>
+        <button onclick="setQueryTemplate('asistenciasGlobales')" class="px-2.5 py-1 rounded bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-300 transition">
+          Resumen de Asistencias por Clase
+        </button>
+      </div>
+
+      <!-- Query Editor Box -->
+      <div class="bg-slate-900 border border-slate-800 rounded-xl p-4 space-y-3">
+        <div class="flex items-center justify-between text-xs text-slate-400 border-b border-slate-800 pb-2">
+          <span class="flex items-center gap-1.5 font-mono">
+            <i data-lucide="code" class="w-3.5 h-3.5 text-indigo-400"></i> T-SQL Query Editor
+          </span>
+          <span class="text-[11px] text-slate-500">Ejecutar: Ctrl + Enter</span>
+        </div>
+        <textarea id="sqlQueryInput" rows="6" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-3 text-slate-100 font-mono text-xs focus:outline-none focus:border-indigo-500 resize-y leading-relaxed" placeholder="Escribe tu consulta SQL aquí... ej: SELECT * FROM Personas;"></textarea>
+        
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-2 text-xs text-slate-400">
+            <span>Máximo de filas:</span>
+            <select id="sqlMaxRows" class="bg-slate-950 border border-slate-800 text-slate-300 rounded px-2 py-1 focus:outline-none">
+              <option value="50">50</option>
+              <option value="200" selected>200</option>
+              <option value="500">500</option>
+            </select>
+          </div>
+          <div class="flex items-center gap-2">
+            <button onclick="exportSqlResultsToCsv()" id="btnExportCsv" class="hidden px-3 py-1.5 text-xs font-medium rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition flex items-center gap-1.5">
+              <i data-lucide="download" class="w-3.5 h-3.5"></i> Exportar CSV
+            </button>
+            <button onclick="executeSqlQuery()" id="btnExecuteSql" class="px-4 py-2 text-xs font-semibold rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white transition flex items-center gap-2 shadow-sm">
+              <i data-lucide="play" class="w-4 h-4 fill-current"></i> Ejecutar Consulta
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- SQL Results Box -->
+      <div id="sqlResultsContainer" class="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden shadow-sm hidden">
+        <div class="p-3 border-b border-slate-800 flex items-center justify-between text-xs text-slate-400">
+          <div class="flex items-center gap-3">
+            <span id="sqlRowCount" class="font-medium text-slate-300">0 filas obtenidas</span>
+            <span id="sqlExecutionTime" class="font-mono text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">-- ms</span>
+          </div>
+          <span id="sqlTruncatedNote" class="text-[11px] text-amber-400 hidden">Límite alcanzado</span>
+        </div>
+        <div class="overflow-x-auto max-h-96">
+          <table class="w-full text-left text-xs text-slate-300">
+            <thead id="sqlResultHead" class="bg-slate-950 uppercase tracking-wider text-[11px] text-slate-400 border-b border-slate-800 sticky top-0"></thead>
+            <tbody id="sqlResultBody" class="divide-y divide-slate-800 font-mono"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- SQL Error Box -->
+      <div id="sqlErrorBox" class="hidden p-4 rounded-xl bg-rose-950/40 border border-rose-800/80 text-rose-200 text-xs space-y-1">
+        <div class="flex items-center gap-2 font-bold text-rose-400">
+          <i data-lucide="alert-octagon" class="w-4 h-4"></i> Error de SQL Server:
+        </div>
+        <p id="sqlErrorMessage" class="font-mono"></p>
+      </div>
+    </section>
+
+    <!-- SECTION 2: EXPLORADOR DE TABLAS -->
+    <section id="studioSection-tablas" class="space-y-6 hidden">
+      <div class="flex items-center justify-between bg-slate-900 border border-slate-800 p-3 rounded-xl text-xs">
+        <div class="flex items-center gap-2">
+          <label class="text-xs text-slate-400 font-medium">Seleccionar Tabla:</label>
+          <select id="tablesSelect" onchange="selectTable(this.value)" class="bg-slate-950 border border-slate-700 text-slate-200 text-xs rounded-lg px-3 py-1.5 focus:outline-none focus:border-indigo-500">
+            <!-- Rendered via JS -->
+          </select>
+        </div>
+      </div>
+
+      <div class="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden shadow-sm">
+        <div class="p-3 border-b border-slate-800 flex items-center justify-between text-xs text-slate-400">
+          <span id="tableInfoBadge">Cargando datos...</span>
+          <div class="flex items-center gap-2">
+            <button id="btnPrevPage" onclick="changePage(-1)" class="px-2 py-1 bg-slate-800 hover:bg-slate-700 rounded text-slate-200 disabled:opacity-40">Anterior</button>
+            <span id="pageIndicator" class="font-mono">Pág 1</span>
+            <button id="btnNextPage" onclick="changePage(1)" class="px-2 py-1 bg-slate-800 hover:bg-slate-700 rounded text-slate-200 disabled:opacity-40">Siguiente</button>
+          </div>
+        </div>
+        <div class="overflow-x-auto">
+          <table class="w-full text-left text-xs text-slate-300">
+            <thead id="browserTableHead" class="bg-slate-950 uppercase tracking-wider text-[11px] text-slate-400 border-b border-slate-800"></thead>
+            <tbody id="browserTableBody" class="divide-y divide-slate-800 font-mono"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- Shared Footer -->
+  <div id="shared-footer"></div>
+
+  <!-- Scripts -->
+  <script src="/js/shared.js"></script>
+  <script src="/js/studio.js"></script>
+</body>
+</html>

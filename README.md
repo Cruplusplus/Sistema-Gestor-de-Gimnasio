@@ -54,8 +54,10 @@ Para satisfacer la totalidad de los requisitos mínimos exigidos por la cátedra
 El repositorio está modularizado en archivos independientes para facilitar el control de versiones y evitar conflictos de mezcla (`merge conflicts`):
 
 ```text
-├── 📄 README.md                    # Documentación y descripción del TPI
-├── 📄 Gimnasio.slnx                # Solución .NET
+├── 📄 README.md                    # Documentación y descripción del proyecto
+├── 📄 agents.md                    # Directrices y convenciones para agentes de desarrollo
+├── 📄 memory.md                    # Memoria operativa, arquitectura y estado del proyecto
+├── 📄 Gimnasio.slnx                # Solución C# .NET 10
 ├── 📁 Creacion de la Base de Datos
 │   ├── 📜 Creacion de BBDD.sql     # Estructura de tablas y restricciones (DDL)
 │   ├── 📜 Insercion de Datos.sql   # Carga masiva de socios, empleados y clases (DML)
@@ -68,35 +70,38 @@ El repositorio está modularizado en archivos independientes para facilitar el c
 └── 📁 src
     └── 📁 Gimnasio.Web             # Aplicación Web ASP.NET Core & Dapper
         ├── 📁 Data                 # Factoría de conexiones y repositorios de alto rendimiento
-        ├── 📁 Endpoints            # Minimal APIs RESTful
+        ├── 📁 Endpoints            # Minimal APIs RESTful agrupadas
         ├── 📁 Models               # Records y DTOs inmutables
-        └── 📁 wwwroot              # SPA interactiva (Tailwind CSS, Lucide Icons, Vanilla JS)
+        └── 📁 wwwroot              # Frontend Multi-Page (Tailwind CSS, Lucide Icons, Vanilla JS)
+            ├── 📄 index.html       # Panel General & KPIs ejecutivos
+            ├── 📄 personas.html    # Directorio, Cargas y Bajas de Personas
+            ├── 📄 operaciones.html # Cobro de cuotas, Asistencias y Cronograma
+            ├── 📄 studio.html      # SQL Studio Libre y Explorador de Tablas
+            └── 📁 js               # Lógica modular (shared, dashboard, personas, operaciones, studio)
 ```
 
 ---
 
-## Entorno Web de Consultas: `Gimnasio.Web` (C# .NET)
+## Software de Gestión: `Gimnasio.Web` (C# .NET)
 
-Para interactuar de forma intuitiva y visual con el motor de base de datos en Docker, se implementó una aplicación web moderna desarrollada en **ASP.NET Core (.NET 10)** y micro-ORM **Dapper**.
+La plataforma web fue diseñada con un enfoque comercial de **producto listo para cliente final**, ofreciendo una interfaz rápida, limpia y desacoplada bajo una arquitectura **Multi-Page Application (MPA)** con rutas amigables en ASP.NET Core (.NET 10) y micro-ORM **Dapper**.
 
 ### Demostración de Conocimiento en SQL y C# .NET Moderno
 
-1. **Acceso a Datos de Alto Rendimiento:**
-   - **Micro-ORM Dapper + ADO.NET (`Microsoft.Data.SqlClient`)**: Conexiones asincrónicas no bloqueantes (`await using`, `IAsyncDisposable`), consultas parametrizadas contra SQL Injection y mapeo directo a memoria de alta velocidad sin la sobrecarga de un ORM pesado.
-   - **Patrón Factory (`IDbConnectionFactory`)**: Desacopla la creación y configuración del connection pooling de SQL Server mediante Inyección de Dependencias.
-2. **C# Moderno (C# 12 / 13):**
-   - **Records inmutables** para DTOs de entrada y salida (`SocioMembresiaActivaDto`, `OcupacionClaseDto`, `RecaudacionMensualDto`, etc.).
+1. **Acceso a Datos de Ultra-Alto Rendimiento:**
+   - **Micro-ORM Dapper + ADO.NET (`Microsoft.Data.SqlClient`)**: Conexiones asincrónicas no bloqueantes (`await using`, `IAsyncDisposable`), consultas parametrizadas contra SQL Injection y mapeo directo a memoria a velocidad de metal, evitando la sobrecarga de un ORM pesado.
+   - **Patrón Factory (`IDbConnectionFactory`)**: Desacopla la creación de conexiones y optimiza el connection pooling nativo de SQL Server vía Inyección de Dependencias.
+2. **C# Moderno (C# 12 / 13 en .NET 10):**
+   - **Records inmutables** para DTOs de entrada y salida (`PersonaListItemDto`, `CrearPersonaRequest`, `SocioMembresiaActivaDto`, `OcupacionClaseDto`, etc.).
    - **Primary Constructors** y **Collection Expressions**.
-   - **Minimal APIs** agrupadas limpiamente mediante `RouteGroupBuilder` con Typed Results.
-3. **Manejo Estructurado de Excepciones SQL:**
-   - Captura precisa de excepciones `SqlException`, identificando números de error y mensajes de `RAISERROR` devueltos tanto por Stored Procedures como por Triggers (ej: validación de vacantes agotadas o contrato inexistente).
-4. **Módulos del Entorno Web:**
-   - 📊 **Dashboard & KPIs:** Monitoreo en vivo del servidor SQL en Docker (ping de conexión en milisegundos, conteo dinámico de socios, empleados, clases, contratos y recaudación acumulada).
-   - 👁️ **Vistas de Negocio:** Visualización interactiva de `vw_SociosMembresiasActivas` (con cálculo de días de gracia/morosidad), `vw_OcupacionClases` (con barras porcentuales de ocupación de salas) y `vw_RecaudacionMensual` (auditoría financiera).
-   - ⚡ **Procedimientos Almacenados:** Formularios para invocar `sp_ReporteAsistenciasSocio` (reporte con filtros de socio y fechas) y `sp_RegistrarPagoMembresia` (demostración de transacción ACID con `BEGIN TRAN`, `COMMIT` y captura de rollback).
-   - 🎯 **Laboratorio de Triggers en Tiempo Real:** Interfaz para inscribir y dar de baja socios en clases, observando cómo `trg_Inscripcion_ActualizarCupo` y `trg_Cancelacion_ActualizarCupo` actualizan el stock de vacantes en SQL Server de manera atómica, y visualizando la cancelación con `ROLLBACK` cuando no hay cupo.
-   - 🗃️ **Explorador de Tablas (Data Browser):** Navegador para consultar cualquiera de las 10 tablas base con paginación optimizada vía `OFFSET ... FETCH NEXT ROWS`.
-   - 💻 **SQL Studio Libre:** Consola para escribir y ejecutar sentencias SQL arbitrarias, midiendo el tiempo de respuesta del motor en ms y permitiendo exportar resultados a CSV.
+   - **Minimal APIs** organizadas por dominios lógicos con `MapGroup("/api")` y Typed Results (`Results.Ok`, `Results.BadRequest`, `Results.Problem`).
+3. **Manejo Estructurado de Excepciones del Motor SQL:**
+   - Captura precisa de `SqlException`, identificando códigos de error y mensajes emitidos por `RAISERROR` en transacciones de cobro y triggers de cupos, protegiendo la base de datos y devolviendo mensajes claros y amigables al usuario.
+4. **Arquitectura Multi-Página (MPA) con Enrutamiento Limpio:**
+   - 📊 **Panel General (`/`):** Métricas comerciales en tiempo real (socios, staff, salones activos, contratos vigentes e ingresos totales), accesos rápidos y estado del servidor SQL.
+   - 👥 **Gestión de Personas (`/personas`):** Directorio unificado con búsqueda y filtros por rol. Alta integral de personas con soporte de herencia (Socio, Staff con cargo, o ambos simultáneamente), baja lógica (desactivación/reactivación con suspensión de membresías) y baja física protegida con validación de movimientos históricos.
+   - 💳 **Operaciones & Clases (`/operaciones`):** Módulo para cobro de cuotas y contratos en caja, reserva de cupos en tiempo real para clases, historial cronológico de presentismo de alumnos y auditoría mensual de ingresos.
+   - 💻 **SQL Studio & Tablas (`/studio`):** Consola para escribir y ejecutar consultas SQL libres con medición de latencia en milisegundos y exportación a CSV, junto a un explorador paginado para las 10 tablas físicas del modelo.
 
 ### Cómo Ejecutar la Aplicación Web
 
@@ -109,7 +114,9 @@ Para interactuar de forma intuitiva y visual con el motor de base de datos en Do
    ```bash
    dotnet run --project src/Gimnasio.Web --urls "http://localhost:5150"
    ```
-3. Abrir en cualquier navegador:
-   ```text
-   http://localhost:5150
-   ```
+3. Abrir en el navegador:
+   - Panel General: `http://localhost:5150/`
+   - Gestión de Personas: `http://localhost:5150/personas`
+   - Operaciones & Clases: `http://localhost:5150/operaciones`
+   - SQL Studio & Tablas: `http://localhost:5150/studio`
+

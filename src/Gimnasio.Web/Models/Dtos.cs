@@ -116,3 +116,38 @@ public sealed record DashboardStatsDto(
     long DatabaseLatencyMs,
     string SqlVersion
 );
+
+public sealed record PersonaListItemDto(
+    long IDPersona,
+    string Nombre,
+    string Apellido,
+    string Email,
+    string? Telefono,
+    DateTime FechaNacimiento,
+    bool Activo,
+    long? IDSocio,
+    DateTime? FechaRegistro,
+    long? IDEmpleado,
+    int? IDRol,
+    string? NombreRol,
+    DateTime? FechaContratacion,
+    string Tipo
+);
+
+public sealed record CrearPersonaRequest(
+    string Nombre,
+    string Apellido,
+    string Email,
+    string? Telefono,
+    DateTime FechaNacimiento,
+    bool EsSocio,
+    DateTime? FechaRegistro,
+    bool EsEmpleado,
+    int? IDRol,
+    DateTime? FechaContratacion
+);
+
+public sealed record RolDto(
+    int IDRol,
+    string NombreRol
+);

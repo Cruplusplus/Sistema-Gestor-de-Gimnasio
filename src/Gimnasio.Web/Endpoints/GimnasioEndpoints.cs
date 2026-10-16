@@ -155,6 +155,100 @@ public static class GimnasioEndpoints
             return Results.Ok(contratos);
         });
 
+        group.MapGet("/catalogos/roles", async (IGimnasioRepository repo, CancellationToken ct) =>
+        {
+            var roles = await repo.GetRolesCatalogAsync(ct);
+            return Results.Ok(roles);
+        });
+
+        // Gestión de Personas (Cargas y Bajas con Herencia)
+        group.MapGet("/personas", async (
+            [FromQuery] string? busqueda,
+            [FromQuery] string? tipo,
+            IGimnasioRepository repo,
+            CancellationToken ct) =>
+        {
+            var personas = await repo.GetPersonasAsync(busqueda, tipo, ct);
+            return Results.Ok(personas);
+        });
+
+        group.MapPost("/personas", async (
+            [FromBody] CrearPersonaRequest request,
+            IGimnasioRepository repo,
+            CancellationToken ct) =>
+        {
+            try
+            {
+                long idPersona = await repo.CrearPersonaAsync(request, ct);
+                return Results.Ok(new
+                {
+                    idPersona,
+                    message = "Persona registrada exitosamente junto a sus clasificaciones."
+                });
+            }
+            catch (ArgumentException ex)
+            {
+                return Results.BadRequest(new { message = ex.Message });
+            }
+            catch (InvalidOperationException ex)
+            {
+                return Results.BadRequest(new { message = ex.Message });
+            }
+            catch (SqlException ex)
+            {
+                return Results.BadRequest(new { message = ex.Message, sqlErrorNumber = ex.Number });
+            }
+        });
+
+        group.MapPut("/personas/{id:long}/toggle-activo", async (
+            long id,
+            IGimnasioRepository repo,
+            CancellationToken ct) =>
+        {
+            try
+            {
+                bool nuevoEstado = await repo.ToggleActivoPersonaAsync(id, ct);
+                return Results.Ok(new
+                {
+                    idPersona = id,
+                    activo = nuevoEstado,
+                    message = nuevoEstado ? "Persona reactivada exitosamente." : "Persona dada de baja lógica (inactiva)."
+                });
+            }
+            catch (SqlException ex)
+            {
+                return Results.BadRequest(new { message = ex.Message });
+            }
+        });
+
+        group.MapDelete("/personas/{id:long}", async (
+            long id,
+            IGimnasioRepository repo,
+            CancellationToken ct) =>
+        {
+            try
+            {
+                await repo.EliminarPersonaAsync(id, ct);
+                return Results.Ok(new
+                {
+                    idPersona = id,
+                    message = "Registro de la persona eliminado permanentemente del sistema."
+                });
+            }
+            catch (KeyNotFoundException ex)
+            {
+                return Results.NotFound(new { message = ex.Message });
+            }
+            catch (InvalidOperationException ex)
+            {
+                return Results.BadRequest(new { message = ex.Message });
+            }
+            catch (SqlException ex)
+            {
+                return Results.BadRequest(new { message = ex.Message });
+            }
+        });
+
         // Explorador de Tablas
         group.MapGet("/tablas", async (IGimnasioRepository repo, CancellationToken ct) =>
         {

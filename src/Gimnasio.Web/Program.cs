@@ -29,4 +29,12 @@ app.UseStaticFiles();
 // Mapeo modular de endpoints de la API
 app.MapGimnasioEndpoints();
 
+// Rutas amigables para navegación limpia Multi-Page (URLs limpias sin .html)
+app.MapGet("/personas", (IWebHostEnvironment env) => 
+    Results.File(Path.Combine(env.WebRootPath, "personas.html"), "text/html"));
+app.MapGet("/operaciones", (IWebHostEnvironment env) => 
+    Results.File(Path.Combine(env.WebRootPath, "operaciones.html"), "text/html"));
+app.MapGet("/studio", (IWebHostEnvironment env) => 
+    Results.File(Path.Combine(env.WebRootPath, "studio.html"), "text/html"));
+
 app.Run();
