@@ -393,4 +393,523 @@ public sealed class GimnasioRepository(IDbConnectionFactory connectionFactory) :
             Truncated: truncated
         );
     }
+
+    public async Task<IEnumerable<PersonaListItemDto>> GetPersonasAsync(string? busqueda = null, string? tipo = null, CancellationToken ct = default)
+    {
+        await using var connection = await connectionFactory.CreateOpenConnectionAsync(ct);
+
+        const string sql = """
+            SELECT 
+                p.IDPersona,
+                p.Nombre,
+                p.Apellido,
+                p.Email,
+                p.Telefono,
+                p.FechaNacimiento,
+                p.Activo,
+                s.IDSocio,
+                s.FechaRegistro,
+                e.IDEmpleado,
+                e.IDRol,
+                r.NombreRol,
+                e.FechaContratacion,
+                CASE 
+                    WHEN s.IDSocio IS NOT NULL AND e.IDEmpleado IS NOT NULL THEN 'Socio y Empleado'
+                    WHEN s.IDSocio IS NOT NULL THEN 'Socio'
+                    WHEN e.IDEmpleado IS NOT NULL THEN 'Empleado'
+                    ELSE 'General'
+                END AS Tipo
+            FROM Personas p
+            LEFT JOIN Socios s ON p.IDPersona = s.IDPersona
+            LEFT JOIN Empleados e ON p.IDPersona = e.IDPersona
+            LEFT JOIN Roles r ON e.IDRol = r.IDRol
+            WHERE (@Busqueda IS NULL OR 
+                   p.Nombre LIKE '%' + @Busqueda + '%' OR 
+                   p.Apellido LIKE '%' + @Busqueda + '%' OR 
+                   p.Email LIKE '%' + @Busqueda + '%' OR 
+                   p.Telefono LIKE '%' + @Busqueda + '%')
+              AND (@Tipo IS NULL OR 
+                   (@Tipo = 'socio' AND s.IDSocio IS NOT NULL) OR 
+                   (@Tipo = 'empleado' AND e.IDEmpleado IS NOT NULL) OR
+                   (@Tipo = 'mixto' AND s.IDSocio IS NOT NULL AND e.IDEmpleado IS NOT NULL))
+            ORDER BY p.IDPersona DESC;
+        """;
+
+        return await connection.QueryAsync<PersonaListItemDto>(new CommandDefinition(sql, new
+        {
+            Busqueda = string.IsNullOrWhiteSpace(busqueda) ? null : busqueda.Trim(),
+            Tipo = string.IsNullOrWhiteSpace(tipo) ? null : tipo.Trim().ToLowerInvariant()
+        }, cancellationToken: ct));
+    }
+
+    public async Task<long> CrearPersonaAsync(CrearPersonaRequest request, CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(request.Nombre) || string.IsNullOrWhiteSpace(request.Apellido))
+        {
+            throw new ArgumentException("Nombre y Apellido son campos requeridos.");
+        }
+        if (string.IsNullOrWhiteSpace(request.Email))
+        {
+            throw new ArgumentException("El Email es un campo requerido.");
+        }
+
+        await using var connection = await connectionFactory.CreateOpenConnectionAsync(ct);
+        await using var transaction = await connection.BeginTransactionAsync(ct);
+
+        try
+        {
+            // Validar unicidad de email
+            const string checkEmailSql = "SELECT COUNT(1) FROM Personas WHERE Email = @Email;";
+            int exists = await connection.ExecuteScalarAsync<int>(new CommandDefinition(checkEmailSql, new { request.Email }, (SqlTransaction)transaction, cancellationToken: ct));
+            if (exists > 0)
+            {
+                throw new InvalidOperationException($"El correo '{request.Email}' ya se encuentra registrado.");
+            }
+
+            // Insertar en Personas
+            const string insertPersonaSql = """
+                INSERT INTO Personas (Nombre, Apellido, Email, Telefono, FechaNacimiento, Activo)
+                OUTPUT INSERTED.IDPersona
+                VALUES (@Nombre, @Apellido, @Email, @Telefono, @FechaNacimiento, 1);
+            """;
+
+            long idPersona = await connection.ExecuteScalarAsync<long>(new CommandDefinition(insertPersonaSql, new
+            {
+                Nombre = request.Nombre.Trim(),
+                Apellido = request.Apellido.Trim(),
+                Email = request.Email.Trim().ToLowerInvariant(),
+                Telefono = string.IsNullOrWhiteSpace(request.Telefono) ? null : request.Telefono.Trim(),
+                FechaNacimiento = request.FechaNacimiento.Date
+            }, (SqlTransaction)transaction, cancellationToken: ct));
+
+            // Si es Socio
+            if (request.EsSocio)
+            {
+                const string insertSocioSql = """
+                    INSERT INTO Socios (IDPersona, FechaRegistro)
+                    VALUES (@IDPersona, @FechaRegistro);
+                """;
+                await connection.ExecuteAsync(new CommandDefinition(insertSocioSql, new
+                {
+                    IDPersona = idPersona,
+                    FechaRegistro = (request.FechaRegistro ?? DateTime.Today).Date
+                }, (SqlTransaction)transaction, cancellationToken: ct));
+            }
+
+            // Si es Empleado
+            if (request.EsEmpleado)
+            {
+                if (!request.IDRol.HasValue)
+                {
+                    throw new ArgumentException("Debe seleccionar un rol para el empleado.");
+                }
+
+                const string insertEmpleadoSql = """
+                    INSERT INTO Empleados (IDPersona, IDRol, FechaContratacion)
+                    VALUES (@IDPersona, @IDRol, @FechaContratacion);
+                """;
+                await connection.ExecuteAsync(new CommandDefinition(insertEmpleadoSql, new
+                {
+                    IDPersona = idPersona,
+                    IDRol = request.IDRol.Value,
+                    FechaContratacion = (request.FechaContratacion ?? DateTime.Today).Date
+                }, (SqlTransaction)transaction, cancellationToken: ct));
+            }
+
+            await transaction.CommitAsync(ct);
+            return idPersona;
+        }
+        catch
+        {
+            await transaction.RollbackAsync(ct);
+            throw;
+        }
+    }
+
+    public async Task<bool> ToggleActivoPersonaAsync(long personaId, CancellationToken ct = default)
+    {
+        await using var connection = await connectionFactory.CreateOpenConnectionAsync(ct);
+        await using var transaction = await connection.BeginTransactionAsync(ct);
+
+        try
+        {
+            const string sqlToggle = """
+                UPDATE Personas
+                SET Activo = CASE WHEN Activo = 1 THEN 0 ELSE 1 END
+                OUTPUT INSERTED.Activo
+                WHERE IDPersona = @IDPersona;
+            """;
+
+            bool nuevoEstado = await connection.ExecuteScalarAsync<bool>(new CommandDefinition(sqlToggle, new { IDPersona = personaId }, (SqlTransaction)transaction, cancellationToken: ct));
+
+            // Si se desactiva, pausamos las membresias activas del socio
+            if (!nuevoEstado)
+            {
+                const string sqlPausarMembresias = """
+                    UPDATE sm
+                    SET sm.Activa = 0
+                    FROM SocioMembresias sm
+                    INNER JOIN Socios s ON sm.IDSocio = s.IDSocio
+                    WHERE s.IDPersona = @IDPersona;
+                """;
+                await connection.ExecuteAsync(new CommandDefinition(sqlPausarMembresias, new { IDPersona = personaId }, (SqlTransaction)transaction, cancellationToken: ct));
+            }
+
+            await transaction.CommitAsync(ct);
+            return nuevoEstado;
+        }
+        catch
+        {
+            await transaction.RollbackAsync(ct);
+            throw;
+        }
+    }
+
+    public async Task EliminarPersonaAsync(long personaId, CancellationToken ct = default)
+    {
+        await using var connection = await connectionFactory.CreateOpenConnectionAsync(ct);
+
+        // Validar dependencias con movimientos transaccionales históricos
+        const string checkDependenciesSql = """
+            SELECT 
+                (SELECT COUNT(1) FROM Pagos pa 
+                 INNER JOIN SocioMembresias sm ON pa.IDSocioMembresia = sm.IDSocioMembresia 
+                 INNER JOIN Socios s ON sm.IDSocio = s.IDSocio 
+                 WHERE s.IDPersona = @IDPersona) AS PagosCount,
+                (SELECT COUNT(1) FROM InscripcionesClase ic 
+                 INNER JOIN Socios s ON ic.IDSocio = s.IDSocio 
+                 WHERE s.IDPersona = @IDPersona) AS InscripcionesCount,
+                (SELECT COUNT(1) FROM HistorialAsistencias ha 
+                 INNER JOIN Socios s ON ha.IDSocio = s.IDSocio 
+                 WHERE s.IDPersona = @IDPersona) AS AsistenciasCount,
+                (SELECT COUNT(1) FROM Clases c 
+                 INNER JOIN Empleados e ON c.IDProfesor = e.IDEmpleado 
+                 WHERE e.IDPersona = @IDPersona) AS ClasesProfesorCount;
+        """;
+
+        var dep = await connection.QuerySingleAsync(new CommandDefinition(checkDependenciesSql, new { IDPersona = personaId }, cancellationToken: ct));
+        int totalHistorico = (int)dep.PagosCount + (int)dep.InscripcionesCount + (int)dep.AsistenciasCount + (int)dep.ClasesProfesorCount;
+
+        if (totalHistorico > 0)
+        {
+            throw new InvalidOperationException("La persona posee movimientos históricos vinculados (cobros, asistencias, inscripciones o clases asignadas). Para preservar la trazabilidad contable y operativa, utilice la 'Baja Lógica' (desactivar).");
+        }
+
+        // Si no tiene dependencias bloqueantes, eliminamos en cascada ordenada dentro de una transacción
+        await using var transaction = await connection.BeginTransactionAsync(ct);
+        try
+        {
+            // Eliminar contratos de membresía sin pagos
+            const string delSocioMembresias = """
+                DELETE sm FROM SocioMembresias sm
+                INNER JOIN Socios s ON sm.IDSocio = s.IDSocio
+                WHERE s.IDPersona = @IDPersona;
+            """;
+            await connection.ExecuteAsync(new CommandDefinition(delSocioMembresias, new { IDPersona = personaId }, (SqlTransaction)transaction, cancellationToken: ct));
+
+            // Eliminar de Socios
+            const string delSocios = "DELETE FROM Socios WHERE IDPersona = @IDPersona;";
+            await connection.ExecuteAsync(new CommandDefinition(delSocios, new { IDPersona = personaId }, (SqlTransaction)transaction, cancellationToken: ct));
+
+            // Eliminar de Empleados
+            const string delEmpleados = "DELETE FROM Empleados WHERE IDPersona = @IDPersona;";
+            await connection.ExecuteAsync(new CommandDefinition(delEmpleados, new { IDPersona = personaId }, (SqlTransaction)transaction, cancellationToken: ct));
+
+            // Eliminar de Personas
+            const string delPersonas = "DELETE FROM Personas WHERE IDPersona = @IDPersona;";
+            int affected = await connection.ExecuteAsync(new CommandDefinition(delPersonas, new { IDPersona = personaId }, (SqlTransaction)transaction, cancellationToken: ct));
+
+            if (affected == 0)
+            {
+                throw new KeyNotFoundException($"No se encontró la persona con ID #{personaId}.");
+            }
+
+            await transaction.CommitAsync(ct);
+        }
+        catch
+        {
+            await transaction.RollbackAsync(ct);
+            throw;
+        }
+    }
+
+    public async Task<IEnumerable<RolDto>> GetRolesCatalogAsync(CancellationToken ct = default)
+    {
+        await using var connection = await connectionFactory.CreateOpenConnectionAsync(ct);
+        const string sql = """
+            SELECT MIN(IDRol) AS IDRol, NombreRol 
+            FROM Roles 
+            GROUP BY NombreRol 
+            ORDER BY NombreRol;
+        """;
+        return await connection.QueryAsync<RolDto>(new CommandDefinition(sql, cancellationToken: ct));
+    }
+
+    public async Task<IEnumerable<MembresiaPlanDto>> GetPlanesMembresiaAsync(CancellationToken ct = default)
+    {
+        await using var connection = await connectionFactory.CreateOpenConnectionAsync(ct);
+        const string sql = """
+            SELECT 
+                MIN(IDMembresia) AS IDMembresia, 
+                Nombre, 
+                MAX(Precio) AS Precio, 
+                MAX(DuracionDias) AS DuracionDias 
+            FROM Membresias 
+            GROUP BY Nombre 
+            ORDER BY Precio ASC;
+        """;
+        return await connection.QueryAsync<MembresiaPlanDto>(new CommandDefinition(sql, cancellationToken: ct));
+    }
+
+    public async Task<IEnumerable<SocioMembresiaDetalleDto>> GetContratosMembresiasAsync(string? busqueda = null, bool? soloActivas = null, CancellationToken ct = default)
+    {
+        await using var connection = await connectionFactory.CreateOpenConnectionAsync(ct);
+
+        const string sql = """
+            SELECT 
+                sm.IDSocioMembresia,
+                sm.IDSocio,
+                p.Nombre AS NombreSocio,
+                p.Apellido AS ApellidoSocio,
+                p.Email AS EmailSocio,
+                m.IDMembresia,
+                m.Nombre AS NombreMembresia,
+                m.Precio AS PrecioPlan,
+                m.DuracionDias,
+                sm.FechaInicio,
+                sm.FechaVencimiento AS FechaFin,
+                sm.Activa,
+                DATEDIFF(day, GETDATE(), sm.FechaVencimiento) AS DiasRestantes,
+                COUNT(pa.IDPago) AS CantidadPagos,
+                ISNULL(SUM(pa.Monto), 0) AS TotalPagado
+            FROM SocioMembresias sm
+            INNER JOIN Socios s ON sm.IDSocio = s.IDSocio
+            INNER JOIN Personas p ON s.IDPersona = p.IDPersona
+            INNER JOIN Membresias m ON sm.IDMembresia = m.IDMembresia
+            LEFT JOIN Pagos pa ON sm.IDSocioMembresia = pa.IDSocioMembresia
+            WHERE (@Busqueda IS NULL OR 
+                   p.Nombre LIKE '%' + @Busqueda + '%' OR 
+                   p.Apellido LIKE '%' + @Busqueda + '%' OR 
+                   p.Email LIKE '%' + @Busqueda + '%' OR 
+                   m.Nombre LIKE '%' + @Busqueda + '%')
+              AND (@SoloActivas = 0 OR sm.Activa = 1)
+            GROUP BY 
+                sm.IDSocioMembresia, sm.IDSocio, p.Nombre, p.Apellido, p.Email,
+                m.IDMembresia, m.Nombre, m.Precio, m.DuracionDias,
+                sm.FechaInicio, sm.FechaVencimiento, sm.Activa
+            ORDER BY sm.IDSocioMembresia DESC;
+        """;
+
+        return await connection.QueryAsync<SocioMembresiaDetalleDto>(new CommandDefinition(sql, new
+        {
+            Busqueda = string.IsNullOrWhiteSpace(busqueda) ? null : busqueda.Trim(),
+            SoloActivas = (soloActivas == true) ? 1 : 0
+        }, cancellationToken: ct));
+    }
+
+    public async Task<long> RegistrarSocioMembresiaAsync(RegistrarSocioMembresiaRequest request, CancellationToken ct = default)
+    {
+        await using var connection = await connectionFactory.CreateOpenConnectionAsync(ct);
+
+        // Validar existencia de Socio
+        const string checkSocioSql = "SELECT COUNT(1) FROM Socios WHERE IDSocio = @IDSocio;";
+        int socioExists = await connection.ExecuteScalarAsync<int>(new CommandDefinition(checkSocioSql, new { request.IDSocio }, cancellationToken: ct));
+        if (socioExists == 0)
+        {
+            throw new KeyNotFoundException($"El socio #{request.IDSocio} no existe.");
+        }
+
+        // Obtener detalles del plan de membresía
+        const string planSql = "SELECT DuracionDias, Precio FROM Membresias WHERE IDMembresia = @IDMembresia;";
+        var plan = await connection.QueryFirstOrDefaultAsync(new CommandDefinition(planSql, new { request.IDMembresia }, cancellationToken: ct));
+        if (plan == null)
+        {
+            throw new KeyNotFoundException($"El plan de membresía #{request.IDMembresia} no existe.");
+        }
+
+        DateTime fechaInicio = request.FechaInicio.Date;
+        DateTime fechaVencimiento = request.FechaFin?.Date ?? fechaInicio.AddDays((int)plan.DuracionDias);
+        bool activa = request.Activa ?? true;
+
+        // Iniciar transacción atómica
+        await using var transaction = await connection.BeginTransactionAsync(ct);
+        try
+        {
+            // Validar restricción UNIQUE (IDSocio, IDMembresia, FechaInicio)
+            const string checkDupSql = """
+                SELECT COUNT(1) FROM SocioMembresias 
+                WHERE IDSocio = @IDSocio AND IDMembresia = @IDMembresia AND FechaInicio = @FechaInicio;
+            """;
+            int dup = await connection.ExecuteScalarAsync<int>(new CommandDefinition(checkDupSql, new
+            {
+                request.IDSocio,
+                request.IDMembresia,
+                FechaInicio = fechaInicio
+            }, (SqlTransaction)transaction, cancellationToken: ct));
+
+            if (dup > 0)
+            {
+                throw new InvalidOperationException("El socio ya posee un contrato activo para este mismo plan con la misma fecha de inicio.");
+            }
+
+            // Insertar contrato en SocioMembresias
+            const string insertContratoSql = """
+                INSERT INTO SocioMembresias (IDSocio, IDMembresia, FechaInicio, FechaVencimiento, Activa)
+                OUTPUT INSERTED.IDSocioMembresia
+                VALUES (@IDSocio, @IDMembresia, @FechaInicio, @FechaVencimiento, @Activa);
+            """;
+
+            long idSocioMembresia = await connection.ExecuteScalarAsync<long>(new CommandDefinition(insertContratoSql, new
+            {
+                request.IDSocio,
+                request.IDMembresia,
+                FechaInicio = fechaInicio,
+                FechaVencimiento = fechaVencimiento,
+                Activa = activa
+            }, (SqlTransaction)transaction, cancellationToken: ct));
+
+            // Si se especificó un pago inicial inmediato
+            if (request.RegistrarPagoInicial == true && request.MontoPagoInicial.HasValue && request.MontoPagoInicial.Value > 0)
+            {
+                const string insertPagoSql = """
+                    INSERT INTO Pagos (IDSocioMembresia, Monto, FechaPago)
+                    VALUES (@IDSocioMembresia, @Monto, @FechaPago);
+                """;
+                await connection.ExecuteAsync(new CommandDefinition(insertPagoSql, new
+                {
+                    IDSocioMembresia = idSocioMembresia,
+                    Monto = request.MontoPagoInicial.Value,
+                    FechaPago = DateTime.Now
+                }, (SqlTransaction)transaction, cancellationToken: ct));
+            }
+
+            await transaction.CommitAsync(ct);
+            return idSocioMembresia;
+        }
+        catch
+        {
+            await transaction.RollbackAsync(ct);
+            throw;
+        }
+    }
+
+    public async Task<bool> ToggleActivaSocioMembresiaAsync(long socioMembresiaId, CancellationToken ct = default)
+    {
+        await using var connection = await connectionFactory.CreateOpenConnectionAsync(ct);
+        const string sql = """
+            UPDATE SocioMembresias
+            SET Activa = CASE WHEN Activa = 1 THEN 0 ELSE 1 END
+            OUTPUT INSERTED.Activa
+            WHERE IDSocioMembresia = @Id;
+        """;
+
+        return await connection.ExecuteScalarAsync<bool>(new CommandDefinition(sql, new { Id = socioMembresiaId }, cancellationToken: ct));
+    }
+
+    public async Task<long> CrearClaseAsync(CrearClaseRequest request, CancellationToken ct = default)
+    {
+        await using var connection = await connectionFactory.CreateOpenConnectionAsync(ct);
+        const string checkProfSql = "SELECT COUNT(1) FROM Empleados WHERE IDEmpleado = @IDProfesor;";
+        int exists = await connection.ExecuteScalarAsync<int>(new CommandDefinition(checkProfSql, new { request.IDProfesor }, cancellationToken: ct));
+        if (exists == 0)
+        {
+            throw new KeyNotFoundException($"El profesor/empleado #{request.IDProfesor} no existe.");
+        }
+
+        const string sql = """
+            INSERT INTO Clases (Nombre, Horario, CupoMaximo, CupoDisponible, IDProfesor)
+            OUTPUT INSERTED.IDClase
+            VALUES (@Nombre, @Horario, @CupoMaximo, @CupoMaximo, @IDProfesor);
+        """;
+
+        return await connection.ExecuteScalarAsync<long>(new CommandDefinition(sql, new
+        {
+            request.Nombre,
+            request.Horario,
+            request.CupoMaximo,
+            request.IDProfesor
+        }, cancellationToken: ct));
+    }
+
+    public async Task EliminarClaseAsync(long claseId, CancellationToken ct = default)
+    {
+        await using var connection = await connectionFactory.CreateOpenConnectionAsync(ct);
+        await using var transaction = await connection.BeginTransactionAsync(ct);
+        try
+        {
+            const string checkSql = "SELECT COUNT(1) FROM Clases WHERE IDClase = @Id;";
+            int exists = await connection.ExecuteScalarAsync<int>(new CommandDefinition(checkSql, new { Id = claseId }, (SqlTransaction)transaction, cancellationToken: ct));
+            if (exists == 0)
+            {
+                throw new KeyNotFoundException($"La clase #{claseId} no existe.");
+            }
+
+            // Eliminar dependencias en cascada para garantizar atomicidad
+            await connection.ExecuteAsync(new CommandDefinition("DELETE FROM HistorialAsistencias WHERE IDClase = @Id;", new { Id = claseId }, (SqlTransaction)transaction, cancellationToken: ct));
+            await connection.ExecuteAsync(new CommandDefinition("DELETE FROM InscripcionesClase WHERE IDClase = @Id;", new { Id = claseId }, (SqlTransaction)transaction, cancellationToken: ct));
+            await connection.ExecuteAsync(new CommandDefinition("DELETE FROM Clases WHERE IDClase = @Id;", new { Id = claseId }, (SqlTransaction)transaction, cancellationToken: ct));
+
+            await transaction.CommitAsync(ct);
+        }
+        catch
+        {
+            await transaction.RollbackAsync(ct);
+            throw;
+        }
+    }
+
+    public async Task<IEnumerable<ProfesorSelectItemDto>> GetProfesoresCatalogAsync(CancellationToken ct = default)
+    {
+        await using var connection = await connectionFactory.CreateOpenConnectionAsync(ct);
+        const string sql = """
+            SELECT 
+                e.IDEmpleado,
+                p.Nombre + ' ' + p.Apellido AS NombreCompleto,
+                ISNULL(r.NombreRol, 'Personal') AS Rol
+            FROM Empleados e
+            INNER JOIN Personas p ON e.IDPersona = p.IDPersona
+            LEFT JOIN Roles r ON e.IDRol = r.IDRol
+            WHERE p.Activo = 1
+            ORDER BY p.Apellido, p.Nombre;
+        """;
+        return await connection.QueryAsync<ProfesorSelectItemDto>(new CommandDefinition(sql, cancellationToken: ct));
+    }
+
+    public async Task<long> CrearPlanMembresiaAsync(CrearPlanMembresiaRequest request, CancellationToken ct = default)
+    {
+        await using var connection = await connectionFactory.CreateOpenConnectionAsync(ct);
+        const string sql = """
+            INSERT INTO Membresias (Nombre, Precio, DuracionDias)
+            OUTPUT INSERTED.IDMembresia
+            VALUES (@Nombre, @Precio, @DuracionDias);
+        """;
+        return await connection.ExecuteScalarAsync<long>(new CommandDefinition(sql, new
+        {
+            request.Nombre,
+            request.Precio,
+            request.DuracionDias
+        }, cancellationToken: ct));
+    }
+
+    public async Task ActualizarPrecioPlanAsync(int membresiaId, decimal nuevoPrecio, CancellationToken ct = default)
+    {
+        await using var connection = await connectionFactory.CreateOpenConnectionAsync(ct);
+        const string sql = """
+            UPDATE Membresias
+            SET Precio = @NuevoPrecio
+            WHERE IDMembresia = @Id;
+        """;
+        int affected = await connection.ExecuteAsync(new CommandDefinition(sql, new
+        {
+            Id = membresiaId,
+            NuevoPrecio = nuevoPrecio
+        }, cancellationToken: ct));
+
+        if (affected == 0)
+        {
+            throw new KeyNotFoundException($"El plan de membresía #{membresiaId} no existe.");
+        }
+    }
 }
+
+

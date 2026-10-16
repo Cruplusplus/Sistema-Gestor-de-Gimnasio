@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="es" class="h-full bg-slate-950 text-slate-100">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Membresías de Socios • GimnasioDB</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <style>
+    ::-webkit-scrollbar { width: 8px; height: 8px; }
+    ::-webkit-scrollbar-track { background: #0f172a; }
+    ::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
+    ::-webkit-scrollbar-thumb:hover { background: #475569; }
+  </style>
+</head>
+<body class="min-h-full flex flex-col font-sans antialiased bg-slate-950 text-slate-100 selection:bg-indigo-500 selection:text-white">
+
+  <!-- Shared Header -->
+  <div id="shared-header"></div>
+
+  <!-- Main Content -->
+  <main class="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8 space-y-6">
+    
+    <!-- Top Action Bar -->
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div>
+        <h2 class="text-xl font-bold text-white tracking-tight">Membresías y Contratos de Socios</h2>
+        <p class="text-sm text-slate-400">Asignación de suscripciones, control de vigencias, pagos iniciales y bajas lógicas</p>
+      </div>
+      <div class="flex items-center gap-2 self-start sm:self-auto">
+        <button onclick="toggleFormNuevoPlan()" id="btnToggleNuevoPlan" class="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition shadow-sm">
+          <i data-lucide="plus-circle" class="w-4 h-4 text-emerald-400"></i> <span id="btnTextNuevoPlan">Nuevo Plan</span>
+        </button>
+        <button onclick="toggleFormAsignacion()" id="btnToggleFormAsignacion" class="flex items-center gap-1.5 px-4 py-2 text-xs font-semibold rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white transition shadow-sm">
+          <i data-lucide="award" class="w-4 h-4"></i> <span id="btnToggleText">Asignar a Socio</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Alert / Toast Container -->
+    <div id="alertContainer" class="hidden"></div>
+
+    <!-- Collapsible Form: Nuevo Plan de Membresía -->
+    <div id="formNuevoPlanContainer" class="hidden bg-slate-900 border border-emerald-500/30 rounded-xl p-5 space-y-4 shadow-lg shadow-emerald-500/5">
+      <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+        <div>
+          <h3 class="font-bold text-white text-sm flex items-center gap-2">
+            <i data-lucide="plus-circle" class="w-4 h-4 text-emerald-400"></i> Alta de Nuevo Plan de Membresía
+          </h3>
+          <p class="text-xs text-slate-400 mt-0.5">Define las características, arancel comercial y duración nominal del nuevo plan.</p>
+        </div>
+        <button onclick="toggleFormNuevoPlan(false)" class="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800">
+          <i data-lucide="x" class="w-4 h-4"></i>
+        </button>
+      </div>
+
+      <form id="formCrearPlan" onsubmit="guardarNuevoPlan(event)" class="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
+        <div>
+          <label class="block text-slate-300 font-medium mb-1">Nombre del Plan *</label>
+          <input type="text" id="nuevoPlanNombre" required placeholder="Ej: Pase Full Matutino" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-slate-200 focus:outline-none focus:border-emerald-500">
+        </div>
+        <div>
+          <label class="block text-slate-300 font-medium mb-1">Arancel / Precio ($ ARS) *</label>
+          <input type="number" id="nuevoPlanPrecio" step="0.01" min="1" required placeholder="35000" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-slate-200 focus:outline-none focus:border-emerald-500 font-mono">
+        </div>
+        <div>
+          <label class="block text-slate-300 font-medium mb-1">Duración Nominal (Días) *</label>
+          <input type="number" id="nuevoPlanDuracion" min="1" max="1000" value="30" required class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-slate-200 focus:outline-none focus:border-emerald-500 font-mono">
+        </div>
+        <div class="sm:col-span-3 flex justify-end gap-2 pt-2 border-t border-slate-800">
+          <button type="button" onclick="toggleFormNuevoPlan(false)" class="px-3.5 py-2 text-slate-400 hover:text-white bg-slate-800 hover:bg-slate-700 rounded-lg transition">Cancelar</button>
+          <button type="submit" id="btnSubmitNuevoPlan" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-medium rounded-lg transition shadow-sm flex items-center gap-1.5">
+            <i data-lucide="check" class="w-4 h-4"></i> Crear Plan de Membresía
+          </button>
+        </div>
+      </form>
+    </div>
+
+    <!-- Collapsible Registration Form -->
+    <div id="formAsignacionContainer" class="hidden bg-slate-900 border border-indigo-500/30 rounded-xl p-5 space-y-4 shadow-lg shadow-indigo-500/5">
+      <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+        <div>
+          <h3 class="font-bold text-white text-sm flex items-center gap-2">
+            <i data-lucide="file-plus-2" class="w-4 h-4 text-indigo-400"></i> Nueva Asignación de Membresía
+          </h3>
+          <p class="text-xs text-slate-400 mt-0.5">Selecciona el socio, el plan correspondiente y configura las fechas de vigencia.</p>
+        </div>
+        <button onclick="toggleFormAsignacion(false)" class="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800">
+          <i data-lucide="x" class="w-4 h-4"></i>
+        </button>
+      </div>
+
+      <form id="formRegistrarMembresia" onsubmit="guardarAsignacionMembresia(event)" class="space-y-4 text-xs">
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <!-- Selector de Socio -->
+          <div class="lg:col-span-2">
+            <label class="block text-slate-300 font-medium mb-1">Socio Destinatario *</label>
+            <select id="selectSocio" required class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-slate-200 focus:outline-none focus:border-indigo-500">
+              <option value="">Cargando socios disponibles...</option>
+            </select>
+            <p class="text-[11px] text-slate-500 mt-1">Solo se muestran personas registradas activamente como socios.</p>
+          </div>
+
+          <!-- Selector de Plan -->
+          <div class="lg:col-span-2">
+            <label class="block text-slate-300 font-medium mb-1">Plan de Membresía *</label>
+            <select id="selectPlan" onchange="onPlanChange()" required class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-slate-200 focus:outline-none focus:border-indigo-500">
+              <option value="">Cargando planes de membresía...</option>
+            </select>
+            <p id="planDetailsHint" class="text-[11px] text-indigo-400 mt-1">Selecciona un plan para auto-calcular duración y costos.</p>
+          </div>
+
+          <!-- Fecha de Inicio -->
+          <div>
+            <label class="block text-slate-300 font-medium mb-1">Fecha de Inicio *</label>
+            <input type="date" id="inputFechaInicio" onchange="recalcularFechaFin()" required class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-slate-200 focus:outline-none focus:border-indigo-500">
+          </div>
+
+          <!-- Fecha de Fin -->
+          <div>
+            <label class="block text-slate-300 font-medium mb-1">Fecha de Finalización *</label>
+            <input type="date" id="inputFechaFin" required class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-slate-200 focus:outline-none focus:border-indigo-500">
+          </div>
+
+          <!-- Pago Inicial Opcional Toggle Card -->
+          <div class="lg:col-span-2 p-3 bg-slate-950 border border-slate-800 rounded-xl space-y-2">
+            <label class="flex items-center gap-2 cursor-pointer">
+              <input type="checkbox" id="checkPagoInicial" onchange="togglePagoInicialFields(this.checked)" class="h-4 w-4 rounded bg-slate-900 border-slate-700 text-indigo-600 focus:ring-0">
+              <div>
+                <span class="font-medium text-white block">Registrar cobro inicial en este acto</span>
+                <span class="text-[11px] text-slate-500">Genera el comprobante de caja y actualiza el saldo del socio de forma inmediata</span>
+              </div>
+            </label>
+          </div>
+        </div>
+
+        <!-- Campos de Pago Inicial (Condicionales) -->
+        <div id="pagoInicialContainer" class="hidden p-3 bg-slate-950/60 border border-emerald-500/30 rounded-xl grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <label class="block text-slate-300 font-medium mb-1">Monto a Cobrar ($ ARS) *</label>
+            <input type="number" id="inputMontoPago" step="0.01" min="1" placeholder="0.00" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-slate-200 focus:outline-none focus:border-emerald-500 font-mono">
+          </div>
+          <div>
+            <label class="block text-slate-300 font-medium mb-1">Método de Cobro *</label>
+            <select id="selectMetodoPago" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-slate-200 focus:outline-none focus:border-emerald-500">
+              <option value="Efectivo">Efectivo</option>
+              <option value="Tarjeta de Débito">Tarjeta de Débito</option>
+              <option value="Tarjeta de Crédito">Tarjeta de Crédito</option>
+              <option value="Transferencia Bancaria">Transferencia Bancaria</option>
+              <option value="Mercado Pago">Mercado Pago</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="flex items-center justify-end gap-3 pt-3 border-t border-slate-800">
+          <button type="button" onclick="toggleFormAsignacion(false)" class="px-3.5 py-2 text-slate-400 hover:text-white bg-slate-800 hover:bg-slate-700 rounded-lg transition">
+            Cancelar
+          </button>
+          <button type="submit" id="btnSubmitMembresia" class="flex items-center gap-1.5 px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-medium rounded-lg transition shadow-sm">
+            <i data-lucide="check" class="w-4 h-4"></i> Confirmar Contrato
+          </button>
+        </div>
+      </form>
+    </div>
+
+    <!-- Planes Disponibles (Cards Grid) -->
+    <div class="space-y-3">
+      <div class="flex items-center justify-between">
+        <h3 class="text-sm font-bold text-white flex items-center gap-2">
+          <i data-lucide="layers" class="w-4 h-4 text-indigo-400"></i> Catálogo de Planes de Membresía
+        </h3>
+        <span class="text-xs text-slate-500" id="cantPlanesBadge">Cargando planes...</span>
+      </div>
+      <div id="planesGrid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <!-- Rendered via JS -->
+      </div>
+    </div>
+
+    <!-- Tabla de Contratos de Socios -->
+    <div class="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden shadow-sm space-y-4 p-5">
+      <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <h3 class="font-bold text-white text-sm flex items-center gap-2">
+            <i data-lucide="scroll-text" class="w-4 h-4 text-indigo-400"></i> Padrón de Contratos y Suscripciones
+          </h3>
+          <p class="text-xs text-slate-400 mt-0.5">Historial y estado de vigencia de las membresías contratadas por los socios</p>
+        </div>
+
+        <!-- Filter Controls -->
+        <div class="flex flex-wrap items-center gap-3">
+          <div class="relative w-full sm:w-64">
+            <i data-lucide="search" class="w-4 h-4 absolute left-3 top-2.5 text-slate-500"></i>
+            <input type="text" id="filtroContratosBusqueda" oninput="debounceBuscarContratos()" placeholder="Buscar por socio, email o plan..." class="w-full bg-slate-950 border border-slate-800 rounded-lg pl-9 pr-3 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-indigo-500">
+          </div>
+
+          <label class="flex items-center gap-2 text-xs text-slate-300 cursor-pointer select-none bg-slate-950 px-3 py-1.5 rounded-lg border border-slate-800 hover:border-slate-700">
+            <input type="checkbox" id="filtroSoloActivas" onchange="cargarContratos()" class="h-3.5 w-3.5 rounded bg-slate-900 border-slate-700 text-indigo-600 focus:ring-0">
+            <span>Solo contratos activos</span>
+          </label>
+
+          <button onclick="cargarContratos()" class="p-1.5 text-slate-400 hover:text-white bg-slate-800 hover:bg-slate-700 rounded-lg transition" title="Refrescar lista">
+            <i data-lucide="refresh-cw" class="w-4 h-4"></i>
+          </button>
+        </div>
+      </div>
+
+      <!-- Resumen rápido de métricas de contratos -->
+      <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-2 border-t border-slate-800/80">
+        <div class="bg-slate-950/60 p-3 rounded-lg border border-slate-800">
+          <span class="text-[11px] text-slate-400 block">Total Contratos</span>
+          <span id="statTotalContratos" class="text-base font-bold text-white">--</span>
+        </div>
+        <div class="bg-slate-950/60 p-3 rounded-lg border border-slate-800">
+          <span class="text-[11px] text-emerald-400 block">Contratos Activos</span>
+          <span id="statContratosActivos" class="text-base font-bold text-emerald-400">--</span>
+        </div>
+        <div class="bg-slate-950/60 p-3 rounded-lg border border-slate-800">
+          <span class="text-[11px] text-amber-400 block">Por Vencer (&le; 7 días)</span>
+          <span id="statPorVencer" class="text-base font-bold text-amber-400">--</span>
+        </div>
+        <div class="bg-slate-950/60 p-3 rounded-lg border border-slate-800">
+          <span class="text-[11px] text-slate-400 block">Total Recaudado</span>
+          <span id="statRecaudadoTotal" class="text-base font-bold text-indigo-400 font-mono">--</span>
+        </div>
+      </div>
+
+      <!-- Table -->
+      <div class="overflow-x-auto border border-slate-800 rounded-lg">
+        <table class="w-full text-left text-xs text-slate-300">
+          <thead class="bg-slate-950 text-slate-400 font-medium uppercase text-[10px] tracking-wider border-b border-slate-800">
+            <tr>
+              <th class="px-4 py-3">Socio</th>
+              <th class="px-4 py-3">Plan de Membresía</th>
+              <th class="px-4 py-3">Período de Vigencia</th>
+              <th class="px-4 py-3">Estado / Días</th>
+              <th class="px-4 py-3 text-right">Monto Pagado</th>
+              <th class="px-4 py-3 text-center">Acciones</th>
+            </tr>
+          </thead>
+          <tbody id="tablaContratosBody" class="divide-y divide-slate-800/60">
+            <tr>
+              <td colspan="6" class="px-4 py-8 text-center text-slate-500">
+                <i data-lucide="loader-2" class="w-5 h-5 animate-spin mx-auto mb-2 text-indigo-400"></i>
+                Cargando historial de membresías...
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </main>
+
+  <!-- Shared Scripts -->
+  <script src="/js/shared.js"></script>
+  <script src="/js/membresias.js"></script>
+</body>
+</html>

@@ -19,4 +19,18 @@ public interface IGimnasioRepository
     Task<IEnumerable<TableSummaryDto>> GetTablesSummaryAsync(CancellationToken ct = default);
     Task<TableDataResult> GetTableDataAsync(string tableName, int page = 1, int pageSize = 20, CancellationToken ct = default);
     Task<DynamicQueryResult> ExecuteDynamicSqlAsync(string sql, int maxRows = 200, CancellationToken ct = default);
+    Task<IEnumerable<PersonaListItemDto>> GetPersonasAsync(string? busqueda = null, string? tipo = null, CancellationToken ct = default);
+    Task<long> CrearPersonaAsync(CrearPersonaRequest request, CancellationToken ct = default);
+    Task<bool> ToggleActivoPersonaAsync(long personaId, CancellationToken ct = default);
+    Task EliminarPersonaAsync(long personaId, CancellationToken ct = default);
+    Task<IEnumerable<RolDto>> GetRolesCatalogAsync(CancellationToken ct = default);
+    Task<IEnumerable<MembresiaPlanDto>> GetPlanesMembresiaAsync(CancellationToken ct = default);
+    Task<IEnumerable<SocioMembresiaDetalleDto>> GetContratosMembresiasAsync(string? busqueda = null, bool? soloActivas = null, CancellationToken ct = default);
+    Task<long> RegistrarSocioMembresiaAsync(RegistrarSocioMembresiaRequest request, CancellationToken ct = default);
+    Task<bool> ToggleActivaSocioMembresiaAsync(long socioMembresiaId, CancellationToken ct = default);
+    Task<long> CrearClaseAsync(CrearClaseRequest request, CancellationToken ct = default);
+    Task EliminarClaseAsync(long claseId, CancellationToken ct = default);
+    Task<IEnumerable<ProfesorSelectItemDto>> GetProfesoresCatalogAsync(CancellationToken ct = default);
+    Task<long> CrearPlanMembresiaAsync(CrearPlanMembresiaRequest request, CancellationToken ct = default);
+    Task ActualizarPrecioPlanAsync(int membresiaId, decimal nuevoPrecio, CancellationToken ct = default);
 }

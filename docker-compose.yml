@@ -1,0 +1,49 @@
+services:
+  sqlserver:
+    image: mcr.microsoft.com/mssql/server:2025-latest
+    container_name: SQLServer2025
+    restart: unless-stopped
+    environment:
+      - ACCEPT_EULA=Y
+      - MSSQL_SA_PASSWORD=BaseDatos#2
+      - MSSQL_PID=Express
+    ports:
+      - "1433:1433"
+    volumes:
+      - sqlserver-data:/var/opt/mssql
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P 'BaseDatos#2' -C -Q 'SELECT 1' 2>/dev/null || /opt/mssql-tools/bin/sqlcmd -S localhost -U sa -P 'BaseDatos#2' -Q 'SELECT 1' 2>/dev/null || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 15
+      start_period: 10s
+
+  db-init:
+    image: mcr.microsoft.com/mssql/server:2025-latest
+    container_name: GimnasioDB-Init
+    depends_on:
+      sqlserver:
+        condition: service_healthy
+    volumes:
+      - ./Creacion de la Base de Datos:/scripts:ro
+      - ./docker/init-db.sh:/init-db.sh:ro
+    entrypoint: ["/bin/bash", "/init-db.sh"]
+    restart: "no"
+
+  web:
+    build:
+      context: .
+      dockerfile: src/Gimnasio.Web/Dockerfile
+    container_name: GimnasioWeb
+    restart: unless-stopped
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ConnectionStrings__DefaultConnection=Server=sqlserver,1433;Database=GimnasioDB;User Id=sa;Password=BaseDatos#2;TrustServerCertificate=True;Connect Timeout=30;
+    ports:
+      - "5150:5150"
+    depends_on:
+      db-init:
+        condition: service_completed_successfully
+
+volumes:
+  sqlserver-data:

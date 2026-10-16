@@ -116,3 +116,98 @@ public sealed record DashboardStatsDto(
     long DatabaseLatencyMs,
     string SqlVersion
 );
+
+public sealed record PersonaListItemDto(
+    long IDPersona,
+    string Nombre,
+    string Apellido,
+    string Email,
+    string? Telefono,
+    DateTime FechaNacimiento,
+    bool Activo,
+    long? IDSocio,
+    DateTime? FechaRegistro,
+    long? IDEmpleado,
+    int? IDRol,
+    string? NombreRol,
+    DateTime? FechaContratacion,
+    string Tipo
+);
+
+public sealed record CrearPersonaRequest(
+    string Nombre,
+    string Apellido,
+    string Email,
+    string? Telefono,
+    DateTime FechaNacimiento,
+    bool EsSocio,
+    DateTime? FechaRegistro,
+    bool EsEmpleado,
+    int? IDRol,
+    DateTime? FechaContratacion
+);
+
+public sealed record RolDto(
+    int IDRol,
+    string NombreRol
+);
+
+public sealed record MembresiaPlanDto(
+    int IDMembresia,
+    string Nombre,
+    decimal Precio,
+    int DuracionDias
+);
+
+public sealed record RegistrarSocioMembresiaRequest(
+    long IDSocio,
+    int IDMembresia,
+    DateTime FechaInicio,
+    DateTime? FechaFin,
+    bool? Activa,
+    bool? RegistrarPagoInicial,
+    decimal? MontoPagoInicial,
+    string? MetodoPagoInicial
+);
+
+public sealed record SocioMembresiaDetalleDto(
+    long IDSocioMembresia,
+    long IDSocio,
+    string NombreSocio,
+    string ApellidoSocio,
+    string EmailSocio,
+    int IDMembresia,
+    string NombreMembresia,
+    decimal PrecioPlan,
+    int DuracionDias,
+    DateTime FechaInicio,
+    DateTime FechaFin,
+    bool Activa,
+    int DiasRestantes,
+    int CantidadPagos,
+    decimal TotalPagado
+);
+
+public sealed record CrearClaseRequest(
+    string Nombre,
+    DateTime Horario,
+    int CupoMaximo,
+    long IDProfesor
+);
+
+public sealed record CrearPlanMembresiaRequest(
+    string Nombre,
+    decimal Precio,
+    int DuracionDias
+);
+
+public sealed record ActualizarPrecioPlanRequest(
+    decimal NuevoPrecio
+);
+
+public sealed record ProfesorSelectItemDto(
+    long IDEmpleado,
+    string NombreCompleto,
+    string Rol
+);
+
