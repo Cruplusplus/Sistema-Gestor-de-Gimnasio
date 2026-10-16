@@ -54,27 +54,45 @@
             <h3 class="font-bold text-white text-sm flex items-center gap-2">
               <i data-lucide="credit-card" class="w-4 h-4 text-emerald-400"></i> Registrar Cobro de Membresía
             </h3>
-            <p class="text-xs text-slate-400 mt-1">Registra cobros parciales o cuotas y actualiza la vigencia del contrato.</p>
+            <p class="text-xs text-slate-400 mt-1">Registra cobros parciales o totales y cancela el saldo adeudado del socio.</p>
           </div>
 
           <form id="formRegistrarPago" onsubmit="runRegistrarPago(event)" class="space-y-3 text-xs">
             <div>
               <label class="block text-slate-300 font-medium mb-1">Contrato de Socio:</label>
-              <select id="spContratoSelect" required class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-slate-200 focus:outline-none focus:border-indigo-500">
+              <select id="spContratoSelect" onchange="onSelectContratoCobro()" required class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-slate-200 focus:outline-none focus:border-indigo-500 font-sans text-xs">
                 <option value="">Cargando contratos...</option>
               </select>
             </div>
+
+            <!-- Resumen dinámico del contrato seleccionado -->
+            <div id="spContratoResumen" class="hidden p-3 rounded-lg text-xs border border-slate-800 bg-slate-950/80 space-y-1 font-sans">
+              <div class="flex items-center justify-between text-slate-400">
+                <span>Arancel del Plan:</span>
+                <span id="resumenPrecioPlan" class="font-bold text-white">$0.00</span>
+              </div>
+              <div class="flex items-center justify-between text-slate-400">
+                <span>Total Abonado:</span>
+                <span id="resumenTotalPagado" class="font-bold text-emerald-400">$0.00</span>
+              </div>
+              <div class="flex items-center justify-between border-t border-slate-800/80 pt-1">
+                <span class="font-medium text-slate-300">Saldo Pendiente:</span>
+                <span id="resumenSaldoPendiente" class="font-bold text-amber-400">$0.00</span>
+              </div>
+              <div id="resumenEstadoBadge" class="pt-1"></div>
+            </div>
+
             <div class="grid grid-cols-2 gap-3">
               <div>
                 <label class="block text-slate-300 font-medium mb-1">Monto a Cobrar ($):</label>
-                <input type="number" id="spPagoMonto" step="0.01" min="1" placeholder="Ej: 30000.00" required class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-slate-200 focus:outline-none focus:border-indigo-500">
+                <input type="number" id="spPagoMonto" step="0.01" min="1" placeholder="Ej: 30000.00" required class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-slate-200 focus:outline-none focus:border-indigo-500 font-mono">
               </div>
               <div>
                 <label class="block text-slate-300 font-medium mb-1">Fecha de Cobro:</label>
                 <input type="datetime-local" id="spPagoFecha" required class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-slate-200 focus:outline-none focus:border-indigo-500">
               </div>
             </div>
-            <button type="submit" class="w-full py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-medium rounded-lg transition flex items-center justify-center gap-2">
+            <button type="submit" id="btnSubmitPago" class="w-full py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-medium rounded-lg transition flex items-center justify-center gap-2 shadow-sm">
               <i data-lucide="check-circle" class="w-4 h-4"></i> Procesar y Guardar Cobro
             </button>
           </form>
@@ -82,28 +100,69 @@
           <div id="spPagoStatus" class="hidden p-3 rounded-lg text-xs border"></div>
         </div>
 
-        <!-- Tabla de Membresías Vigentes -->
+        <!-- Tabla de Membresías Vigentes y Estado de Cobro -->
         <div class="bg-slate-900 border border-slate-800 rounded-xl p-5 space-y-3 lg:col-span-2">
           <div class="flex items-center justify-between border-b border-slate-800 pb-2">
-            <h3 class="font-bold text-white text-sm flex items-center gap-2">
-              <i data-lucide="badge-check" class="w-4 h-4 text-indigo-400"></i> Pases y Membresías Activas
-            </h3>
-            <span id="contratosCountBadge" class="text-xs text-slate-400">Cargando...</span>
+            <div>
+              <h3 class="font-bold text-white text-sm flex items-center gap-2">
+                <i data-lucide="badge-check" class="w-4 h-4 text-indigo-400"></i> Pases y Membresías Activas
+              </h3>
+              <p class="text-[11px] text-slate-400">Control visual de membresías pagadas, parciales o impagas</p>
+            </div>
+            <div class="flex items-center gap-2">
+              <span id="contratosCountBadge" class="text-xs text-slate-400 bg-slate-800 px-2 py-0.5 rounded-full">Cargando...</span>
+              <button onclick="loadContratosVigentes()" class="p-1.5 hover:bg-slate-800 rounded-lg text-slate-400 hover:text-white transition" title="Refrescar">
+                <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>
+              </button>
+            </div>
           </div>
           <div class="overflow-x-auto max-h-96">
             <table class="w-full text-left text-xs text-slate-300">
               <thead class="bg-slate-950 sticky top-0 text-[11px] text-slate-400 uppercase tracking-wider border-b border-slate-800">
                 <tr>
                   <th class="p-2.5">Socio</th>
-                  <th class="p-2.5">Plan</th>
-                  <th class="p-2.5">Inicio</th>
+                  <th class="p-2.5">Plan & Arancel</th>
+                  <th class="p-2.5">Abonado / Saldo</th>
+                  <th class="p-2.5">Estado Cobro</th>
                   <th class="p-2.5">Vencimiento</th>
-                  <th class="p-2.5">Estado / Días</th>
+                  <th class="p-2.5 text-center">Acción</th>
                 </tr>
               </thead>
               <tbody id="contratosTableBody" class="divide-y divide-slate-800/70 font-sans"></tbody>
             </table>
           </div>
+        </div>
+      </div>
+
+      <!-- Historial de Pagos y Comprobantes en Caja -->
+      <div class="bg-slate-900 border border-slate-800 rounded-xl p-5 space-y-3">
+        <div class="flex items-center justify-between border-b border-slate-800 pb-2">
+          <div>
+            <h3 class="font-bold text-white text-sm flex items-center gap-2">
+              <i data-lucide="receipt" class="w-4 h-4 text-emerald-400"></i> Historial de Cobros en Caja (Últimos Comprobantes)
+            </h3>
+            <p class="text-[11px] text-slate-400">Listado de transacciones recientes. Si un cobro se registró por error, puedes anularlo para revertir el saldo.</p>
+          </div>
+          <button onclick="loadHistorialPagos()" class="p-1.5 hover:bg-slate-800 rounded-lg text-slate-400 hover:text-white transition" title="Refrescar historial">
+            <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>
+          </button>
+        </div>
+        <div class="overflow-x-auto max-h-80">
+          <table class="w-full text-left text-xs text-slate-300">
+            <thead class="bg-slate-950 sticky top-0 text-[11px] text-slate-400 uppercase tracking-wider border-b border-slate-800">
+              <tr>
+                <th class="p-2.5"># Recibo</th>
+                <th class="p-2.5">Socio</th>
+                <th class="p-2.5">Plan / Concepto</th>
+                <th class="p-2.5">Fecha y Hora</th>
+                <th class="p-2.5 text-right">Monto</th>
+                <th class="p-2.5 text-center">Acciones</th>
+              </tr>
+            </thead>
+            <tbody id="pagosTableBody" class="divide-y divide-slate-800/70 font-sans">
+              <tr><td colspan="6" class="p-3 text-center text-slate-500">Cargando comprobantes...</td></tr>
+            </tbody>
+          </table>
         </div>
       </div>
     </div>

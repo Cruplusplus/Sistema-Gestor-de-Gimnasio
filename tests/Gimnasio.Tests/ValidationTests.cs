@@ -152,4 +152,37 @@ public class ValidationTests
 
         result.IsValid.Should().BeTrue();
     }
+
+    [Fact]
+    public void PagoValidator_ConDatosValidos_DebePasar()
+    {
+        var validator = new RegistrarPagoRequestValidator();
+        var request = new RegistrarPagoRequest(
+            IDSocioMembresia: 1,
+            Monto: 35000m,
+            FechaPago: DateTime.Now
+        );
+
+        var result = validator.Validate(request);
+
+        result.IsValid.Should().BeTrue();
+    }
+
+    [Theory]
+    [InlineData(0, "El monto a pagar debe ser mayor a cero.")]
+    [InlineData(-100, "El monto a pagar debe ser mayor a cero.")]
+    public void PagoValidator_ConMontoInvalido_DebeFallar(decimal montoInvalido, string errorEsperado)
+    {
+        var validator = new RegistrarPagoRequestValidator();
+        var request = new RegistrarPagoRequest(
+            IDSocioMembresia: 1,
+            Monto: montoInvalido,
+            FechaPago: DateTime.Now
+        );
+
+        var result = validator.Validate(request);
+
+        result.IsValid.Should().BeFalse();
+        result.Errors.Should().Contain(e => e.ErrorMessage == errorEsperado);
+    }
 }

@@ -10,6 +10,8 @@ public interface IGimnasioRepository
     Task<IEnumerable<RecaudacionMensualDto>> GetRecaudacionMensualAsync(CancellationToken ct = default);
     Task<IEnumerable<AsistenciaReporteDto>> GetReporteAsistenciasSocioAsync(long socioId, DateTime fechaDesde, DateTime fechaHasta, CancellationToken ct = default);
     Task RegistrarPagoMembresiaAsync(long socioMembresiaId, decimal monto, DateTime fechaPago, CancellationToken ct = default);
+    Task<IEnumerable<PagoListItemDto>> GetPagosRecientesAsync(int limit = 50, CancellationToken ct = default);
+    Task EliminarPagoAsync(long idPago, CancellationToken ct = default);
     Task<long> InscribirSocioClaseAsync(long socioId, long claseId, DateTime fechaInscripcion, CancellationToken ct = default);
     Task CancelarInscripcionClaseAsync(long inscripcionId, CancellationToken ct = default);
     Task<IEnumerable<InscripcionDto>> GetInscripcionesRecientesAsync(CancellationToken ct = default);
@@ -28,6 +30,7 @@ public interface IGimnasioRepository
     Task<IEnumerable<SocioMembresiaDetalleDto>> GetContratosMembresiasAsync(string? busqueda = null, bool? soloActivas = null, CancellationToken ct = default);
     Task<long> RegistrarSocioMembresiaAsync(RegistrarSocioMembresiaRequest request, CancellationToken ct = default);
     Task<bool> ToggleActivaSocioMembresiaAsync(long socioMembresiaId, CancellationToken ct = default);
+    Task EliminarSocioMembresiaAsync(long socioMembresiaId, CancellationToken ct = default);
     Task<long> CrearClaseAsync(CrearClaseRequest request, CancellationToken ct = default);
     Task EliminarClaseAsync(long claseId, CancellationToken ct = default);
     Task<IEnumerable<ProfesorSelectItemDto>> GetProfesoresCatalogAsync(CancellationToken ct = default);

@@ -60,15 +60,42 @@ public sealed class GimnasioRepository(IDbConnectionFactory connectionFactory) :
         await using var connection = await connectionFactory.CreateOpenConnectionAsync(ct);
         const string sql = """
             SELECT 
-                IDSocio,
-                Socio,
-                Email,
-                PlanContratado,
-                FechaInicio,
-                FechaVencimiento,
-                DiasRestantes
-            FROM vw_SociosMembresiasActivas
-            ORDER BY DiasRestantes ASC;
+                sm.IDSocioMembresia,
+                sm.IDSocio,
+                p.Nombre + ' ' + p.Apellido AS Socio,
+                p.Email,
+                m.Nombre AS PlanContratado,
+                m.Precio AS PrecioPlan,
+                ISNULL(SUM(pa.Monto), 0) AS TotalPagado,
+                CASE 
+                    WHEN (m.Precio - ISNULL(SUM(pa.Monto), 0)) < 0 THEN 0 
+                    ELSE (m.Precio - ISNULL(SUM(pa.Monto), 0)) 
+                END AS SaldoPendiente,
+                CASE 
+                    WHEN ISNULL(SUM(pa.Monto), 0) >= m.Precio THEN 'Pagada'
+                    WHEN ISNULL(SUM(pa.Monto), 0) > 0 THEN 'Parcial'
+                    ELSE 'Impaga'
+                END AS EstadoPago,
+                sm.FechaInicio,
+                sm.FechaVencimiento,
+                DATEDIFF(day, GETDATE(), sm.FechaVencimiento) AS DiasRestantes
+            FROM SocioMembresias sm
+            INNER JOIN Socios s ON sm.IDSocio = s.IDSocio
+            INNER JOIN Personas p ON s.IDPersona = p.IDPersona
+            INNER JOIN Membresias m ON sm.IDMembresia = m.IDMembresia
+            LEFT JOIN Pagos pa ON sm.IDSocioMembresia = pa.IDSocioMembresia
+            WHERE sm.Activa = 1
+            GROUP BY 
+                sm.IDSocioMembresia,
+                sm.IDSocio,
+                p.Nombre,
+                p.Apellido,
+                p.Email,
+                m.Nombre,
+                m.Precio,
+                sm.FechaInicio,
+                sm.FechaVencimiento
+            ORDER BY sm.FechaVencimiento ASC;
         """;
 
         return await connection.QueryAsync<SocioMembresiaActivaDto>(new CommandDefinition(sql, cancellationToken: ct));
@@ -147,6 +174,40 @@ public sealed class GimnasioRepository(IDbConnectionFactory connectionFactory) :
         );
 
         await connection.ExecuteAsync(cmd);
+    }
+
+    public async Task<IEnumerable<PagoListItemDto>> GetPagosRecientesAsync(int limit = 50, CancellationToken ct = default)
+    {
+        await using var connection = await connectionFactory.CreateOpenConnectionAsync(ct);
+        const string sql = """
+            SELECT TOP (@Limit)
+                pa.IDPago,
+                pa.IDSocioMembresia,
+                s.IDSocio,
+                p.Nombre + ' ' + p.Apellido AS Socio,
+                m.Nombre AS PlanContratado,
+                pa.Monto,
+                pa.FechaPago
+            FROM Pagos pa
+            INNER JOIN SocioMembresias sm ON pa.IDSocioMembresia = sm.IDSocioMembresia
+            INNER JOIN Socios s ON sm.IDSocio = s.IDSocio
+            INNER JOIN Personas p ON s.IDPersona = p.IDPersona
+            INNER JOIN Membresias m ON sm.IDMembresia = m.IDMembresia
+            ORDER BY pa.IDPago DESC;
+        """;
+
+        return await connection.QueryAsync<PagoListItemDto>(new CommandDefinition(sql, new { Limit = Math.Clamp(limit, 1, 200) }, cancellationToken: ct));
+    }
+
+    public async Task EliminarPagoAsync(long idPago, CancellationToken ct = default)
+    {
+        await using var connection = await connectionFactory.CreateOpenConnectionAsync(ct);
+        const string sql = "DELETE FROM Pagos WHERE IDPago = @IdPago;";
+        int affected = await connection.ExecuteAsync(new CommandDefinition(sql, new { IdPago = idPago }, cancellationToken: ct));
+        if (affected == 0)
+        {
+            throw new KeyNotFoundException($"El comprobante de cobro #{idPago} no existe.");
+        }
     }
 
     public async Task<long> InscribirSocioClaseAsync(long socioId, long claseId, DateTime fechaInscripcion, CancellationToken ct = default)
@@ -249,12 +310,31 @@ public sealed class GimnasioRepository(IDbConnectionFactory connectionFactory) :
                 p.Nombre + ' ' + p.Apellido AS Socio,
                 m.Nombre AS PlanContratado,
                 m.Precio AS PrecioPlan,
+                ISNULL(SUM(pa.Monto), 0) AS TotalPagado,
+                CASE 
+                    WHEN (m.Precio - ISNULL(SUM(pa.Monto), 0)) < 0 THEN 0 
+                    ELSE (m.Precio - ISNULL(SUM(pa.Monto), 0)) 
+                END AS SaldoPendiente,
+                CASE 
+                    WHEN ISNULL(SUM(pa.Monto), 0) >= m.Precio THEN 'Pagada'
+                    WHEN ISNULL(SUM(pa.Monto), 0) > 0 THEN 'Parcial'
+                    ELSE 'Impaga'
+                END AS EstadoPago,
                 sm.Activa,
                 sm.FechaVencimiento
             FROM SocioMembresias sm
             INNER JOIN Socios s ON sm.IDSocio = s.IDSocio
             INNER JOIN Personas p ON s.IDPersona = p.IDPersona
             INNER JOIN Membresias m ON sm.IDMembresia = m.IDMembresia
+            LEFT JOIN Pagos pa ON sm.IDSocioMembresia = pa.IDSocioMembresia
+            GROUP BY 
+                sm.IDSocioMembresia,
+                p.Nombre,
+                p.Apellido,
+                m.Nombre,
+                m.Precio,
+                sm.Activa,
+                sm.FechaVencimiento
             ORDER BY sm.IDSocioMembresia DESC;
         """;
 
@@ -681,7 +761,16 @@ public sealed class GimnasioRepository(IDbConnectionFactory connectionFactory) :
                 sm.Activa,
                 DATEDIFF(day, GETDATE(), sm.FechaVencimiento) AS DiasRestantes,
                 COUNT(pa.IDPago) AS CantidadPagos,
-                ISNULL(SUM(pa.Monto), 0) AS TotalPagado
+                ISNULL(SUM(pa.Monto), 0) AS TotalPagado,
+                CASE 
+                    WHEN (m.Precio - ISNULL(SUM(pa.Monto), 0)) < 0 THEN 0 
+                    ELSE (m.Precio - ISNULL(SUM(pa.Monto), 0)) 
+                END AS SaldoPendiente,
+                CASE 
+                    WHEN ISNULL(SUM(pa.Monto), 0) >= m.Precio THEN 'Pagada'
+                    WHEN ISNULL(SUM(pa.Monto), 0) > 0 THEN 'Parcial'
+                    ELSE 'Impaga'
+                END AS EstadoPago
             FROM SocioMembresias sm
             INNER JOIN Socios s ON sm.IDSocio = s.IDSocio
             INNER JOIN Personas p ON s.IDPersona = p.IDPersona
@@ -804,6 +893,32 @@ public sealed class GimnasioRepository(IDbConnectionFactory connectionFactory) :
         """;
 
         return await connection.ExecuteScalarAsync<bool>(new CommandDefinition(sql, new { Id = socioMembresiaId }, cancellationToken: ct));
+    }
+
+    public async Task EliminarSocioMembresiaAsync(long socioMembresiaId, CancellationToken ct = default)
+    {
+        await using var connection = await connectionFactory.CreateOpenConnectionAsync(ct);
+        await using var transaction = await connection.BeginTransactionAsync(ct);
+        try
+        {
+            const string checkSql = "SELECT COUNT(1) FROM SocioMembresias WHERE IDSocioMembresia = @Id;";
+            int exists = await connection.ExecuteScalarAsync<int>(new CommandDefinition(checkSql, new { Id = socioMembresiaId }, (SqlTransaction)transaction, cancellationToken: ct));
+            if (exists == 0)
+            {
+                throw new KeyNotFoundException($"El contrato de membresía #{socioMembresiaId} no existe.");
+            }
+
+            // Eliminar pagos vinculados al contrato erróneo en cascada atómica
+            await connection.ExecuteAsync(new CommandDefinition("DELETE FROM Pagos WHERE IDSocioMembresia = @Id;", new { Id = socioMembresiaId }, (SqlTransaction)transaction, cancellationToken: ct));
+            await connection.ExecuteAsync(new CommandDefinition("DELETE FROM SocioMembresias WHERE IDSocioMembresia = @Id;", new { Id = socioMembresiaId }, (SqlTransaction)transaction, cancellationToken: ct));
+
+            await transaction.CommitAsync(ct);
+        }
+        catch
+        {
+            await transaction.RollbackAsync(ct);
+            throw;
+        }
     }
 
     public async Task<long> CrearClaseAsync(CrearClaseRequest request, CancellationToken ct = default)

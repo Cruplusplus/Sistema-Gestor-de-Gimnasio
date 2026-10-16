@@ -1,10 +1,15 @@
 namespace Gimnasio.Web.Models;
 
 public sealed record SocioMembresiaActivaDto(
+    long IDSocioMembresia,
     long IDSocio,
     string Socio,
     string Email,
     string PlanContratado,
+    decimal PrecioPlan,
+    decimal TotalPagado,
+    decimal SaldoPendiente,
+    string EstadoPago,
     DateTime FechaInicio,
     DateTime FechaVencimiento,
     int DiasRestantes
@@ -55,6 +60,9 @@ public sealed record ContratoSelectItemDto(
     string Socio,
     string PlanContratado,
     decimal PrecioPlan,
+    decimal TotalPagado,
+    decimal SaldoPendiente,
+    string EstadoPago,
     bool Activa,
     DateTime FechaVencimiento
 );
@@ -185,7 +193,9 @@ public sealed record SocioMembresiaDetalleDto(
     bool Activa,
     int DiasRestantes,
     int CantidadPagos,
-    decimal TotalPagado
+    decimal TotalPagado,
+    decimal SaldoPendiente,
+    string EstadoPago
 );
 
 public sealed record CrearClaseRequest(
@@ -209,5 +219,15 @@ public sealed record ProfesorSelectItemDto(
     long IDEmpleado,
     string NombreCompleto,
     string Rol
+);
+
+public sealed record PagoListItemDto(
+    long IDPago,
+    long IDSocioMembresia,
+    long IDSocio,
+    string Socio,
+    string PlanContratado,
+    decimal Monto,
+    DateTime FechaPago
 );
 

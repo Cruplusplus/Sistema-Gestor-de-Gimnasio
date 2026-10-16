@@ -1,6 +1,7 @@
 // GimnasioDB - Módulo de Operaciones & Clases (operaciones.js)
 
 let currentSubTab = 'cobros';
+let contratosCache = [];
 
 document.addEventListener('DOMContentLoaded', async () => {
   renderSharedHeader('operaciones');
@@ -19,9 +20,10 @@ document.addEventListener('DOMContentLoaded', async () => {
   if (spFechaHasta) spFechaHasta.value = today;
   if (spPagoFecha) spPagoFecha.value = nowIso;
 
-  // Cargar catálogos iniciales
+  // Cargar catálogos y tablas iniciales
   await loadCatalogs();
   await loadContratosVigentes();
+  await loadHistorialPagos();
 });
 
 function switchOperacionSubTab(subTabId) {
@@ -44,7 +46,11 @@ function switchOperacionSubTab(subTabId) {
 
   if (window.lucide) lucide.createIcons();
 
-  if (subTabId === 'cobros') loadContratosVigentes();
+  if (subTabId === 'cobros') {
+    loadContratosVigentes();
+    loadCatalogs();
+    loadHistorialPagos();
+  }
   if (subTabId === 'inscripciones') {
     loadClasesCatalog();
     loadInscripcionesRecientes();
@@ -58,7 +64,7 @@ async function loadContratosVigentes() {
   const countBadge = document.getElementById('contratosCountBadge');
   if (!tbody) return;
 
-  tbody.innerHTML = '<tr><td colspan="5" class="p-3 text-center text-slate-500">Cargando contratos...</td></tr>';
+  tbody.innerHTML = '<tr><td colspan="6" class="p-3 text-center text-slate-500">Cargando contratos...</td></tr>';
 
   try {
     const res = await fetch('/api/vistas/socios-membresias-activas');
@@ -67,14 +73,42 @@ async function loadContratosVigentes() {
     if (countBadge) countBadge.textContent = `${data.length} vigentes`;
 
     if (data.length === 0) {
-      tbody.innerHTML = '<tr><td colspan="5" class="p-3 text-center text-slate-500">No hay contratos activos registrados.</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="6" class="p-3 text-center text-slate-500">No hay contratos activos registrados.</td></tr>';
       return;
     }
 
     tbody.innerHTML = data.map(item => {
-      let badgeColor = 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20';
-      if (item.diasRestantes <= 0) badgeColor = 'bg-rose-500/10 text-rose-400 border-rose-500/20';
-      else if (item.diasRestantes <= 7) badgeColor = 'bg-amber-500/10 text-amber-400 border-amber-500/20';
+      let badgeVenc = 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20';
+      if (item.diasRestantes <= 0) badgeVenc = 'bg-rose-500/10 text-rose-400 border-rose-500/20';
+      else if (item.diasRestantes <= 7) badgeVenc = 'bg-amber-500/10 text-amber-400 border-amber-500/20';
+
+      let estadoBadge = '';
+      if (item.estadoPago === 'Pagada') {
+        estadoBadge = '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 inline-flex items-center gap-1"><i data-lucide="check-circle" class="w-3 h-3"></i> Pagada</span>';
+      } else if (item.estadoPago === 'Parcial') {
+        estadoBadge = '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500/10 text-amber-400 border border-amber-500/20 inline-flex items-center gap-1"><i data-lucide="clock" class="w-3 h-3"></i> Parcial</span>';
+      } else {
+        estadoBadge = '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-rose-500/10 text-rose-400 border border-rose-500/20 inline-flex items-center gap-1"><i data-lucide="alert-circle" class="w-3 h-3"></i> Impaga</span>';
+      }
+
+      const saldoFormatted = formatCurrency(item.saldoPendiente);
+      const abonadoFormatted = formatCurrency(item.totalPagado);
+      const precioFormatted = formatCurrency(item.precioPlan);
+
+      let actionBtn = '';
+      if (item.saldoPendiente > 0) {
+        actionBtn = `
+          <button onclick="seleccionarContratoParaCobro(${item.idSocioMembresia})" class="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-semibold flex items-center gap-1 shadow-sm transition whitespace-nowrap">
+            <i data-lucide="credit-card" class="w-3.5 h-3.5"></i> Cobrar
+          </button>
+        `;
+      } else {
+        actionBtn = `
+          <button onclick="seleccionarContratoParaCobro(${item.idSocioMembresia})" class="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-slate-200 rounded-lg text-xs font-medium flex items-center gap-1 transition whitespace-nowrap" title="Membresía al día. Clic para registrar cobro extra si fuera necesario.">
+            <i data-lucide="check" class="w-3.5 h-3.5 text-emerald-400"></i> Al día
+          </button>
+        `;
+      }
 
       return `
         <tr class="hover:bg-slate-800/40">
@@ -82,29 +116,105 @@ async function loadContratosVigentes() {
             <span class="font-medium text-white block">${escapeHtml(item.socio)}</span>
             <span class="text-[11px] text-slate-500">${escapeHtml(item.email)}</span>
           </td>
-          <td class="p-2.5 text-indigo-300 font-medium">${escapeHtml(item.planContratado)}</td>
-          <td class="p-2.5 text-slate-400 font-mono">${formatDate(item.fechaInicio)}</td>
-          <td class="p-2.5 text-slate-400 font-mono">${formatDate(item.fechaVencimiento)}</td>
           <td class="p-2.5">
-            <span class="px-2 py-0.5 rounded text-[11px] font-bold border ${badgeColor}">
+            <span class="text-indigo-300 font-medium block">${escapeHtml(item.planContratado)}</span>
+            <span class="text-[11px] text-slate-400 font-mono">${precioFormatted}</span>
+          </td>
+          <td class="p-2.5 font-sans">
+            <span class="text-emerald-400 font-semibold font-mono block">${abonadoFormatted}</span>
+            <span class="text-[11px] text-slate-400">Saldo: <strong class="${item.saldoPendiente > 0 ? 'text-amber-400 font-semibold' : 'text-slate-500'} font-mono">${saldoFormatted}</strong></span>
+          </td>
+          <td class="p-2.5">
+            ${estadoBadge}
+          </td>
+          <td class="p-2.5">
+            <span class="font-mono text-slate-300 text-[11px] block">${formatDate(item.fechaVencimiento)}</span>
+            <span class="px-1.5 py-0.2 rounded text-[10px] font-bold border ${badgeVenc}">
               ${item.diasRestantes > 0 ? `${item.diasRestantes} días` : 'Vencido'}
             </span>
+          </td>
+          <td class="p-2.5 text-center">
+            ${actionBtn}
           </td>
         </tr>
       `;
     }).join('');
 
+    if (window.lucide) lucide.createIcons();
   } catch (err) {
     console.error(err);
-    tbody.innerHTML = `<tr><td colspan="5" class="p-3 text-center text-rose-400">${err.message}</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="6" class="p-3 text-center text-rose-400">${err.message}</td></tr>`;
+  }
+}
+
+function onSelectContratoCobro() {
+  const select = document.getElementById('spContratoSelect');
+  const resumenBox = document.getElementById('spContratoResumen');
+  const montoInput = document.getElementById('spPagoMonto');
+  if (!select || !resumenBox) return;
+
+  const id = parseInt(select.value);
+  const contrato = contratosCache.find(c => c.idSocioMembresia === id);
+  if (!contrato) {
+    resumenBox.classList.add('hidden');
+    return;
+  }
+
+  resumenBox.classList.remove('hidden');
+  document.getElementById('resumenPrecioPlan').textContent = formatCurrency(contrato.precioPlan);
+  document.getElementById('resumenTotalPagado').textContent = formatCurrency(contrato.totalPagado);
+  document.getElementById('resumenSaldoPendiente').textContent = formatCurrency(contrato.saldoPendiente);
+
+  const badgeContainer = document.getElementById('resumenEstadoBadge');
+  if (contrato.estadoPago === 'Pagada') {
+    badgeContainer.innerHTML = '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 inline-flex items-center gap-1"><i data-lucide="check-circle" class="w-3 h-3"></i> Contrato 100% Abonado (Sin saldo deudor)</span>';
+    montoInput.value = '';
+    montoInput.placeholder = 'Ingresar monto (opcional / cuota extra)';
+  } else if (contrato.estadoPago === 'Parcial') {
+    badgeContainer.innerHTML = `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500/10 text-amber-400 border border-amber-500/20 inline-flex items-center gap-1"><i data-lucide="clock" class="w-3 h-3"></i> Pago Parcial Registrado (Resta abonar ${formatCurrency(contrato.saldoPendiente)})</span>`;
+    montoInput.value = contrato.saldoPendiente;
+  } else {
+    badgeContainer.innerHTML = '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-rose-500/10 text-rose-400 border border-rose-500/20 inline-flex items-center gap-1"><i data-lucide="alert-circle" class="w-3 h-3"></i> Impaga (Abono pendiente del 100%)</span>';
+    montoInput.value = contrato.saldoPendiente > 0 ? contrato.saldoPendiente : contrato.precioPlan;
+  }
+
+  if (window.lucide) lucide.createIcons();
+}
+
+function seleccionarContratoParaCobro(idContrato) {
+  const select = document.getElementById('spContratoSelect');
+  if (select) {
+    select.value = idContrato;
+    onSelectContratoCobro();
+    const form = document.getElementById('formRegistrarPago');
+    if (form) {
+      form.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      const montoInput = document.getElementById('spPagoMonto');
+      if (montoInput) {
+        montoInput.focus();
+        montoInput.select();
+      }
+    }
   }
 }
 
 async function runRegistrarPago(e) {
   e.preventDefault();
-  const contratoId = document.getElementById('spContratoSelect').value;
+  const contratoId = parseInt(document.getElementById('spContratoSelect').value);
   const monto = parseFloat(document.getElementById('spPagoMonto').value);
   const fecha = document.getElementById('spPagoFecha').value;
+
+  if (isNaN(contratoId) || contratoId <= 0) {
+    alert('Por favor selecciona un contrato de socio válido.');
+    return;
+  }
+
+  const contrato = contratosCache.find(c => c.idSocioMembresia === contratoId);
+  if (contrato && contrato.saldoPendiente <= 0) {
+    if (!confirm(`El contrato #${contratoId} de ${contrato.socio} ya figura 100% abonado ($${contrato.totalPagado} pagados).\n\n¿Estás seguro de registrar un cobro adicional por ${formatCurrency(monto)}?`)) {
+      return;
+    }
+  }
 
   const statusBox = document.getElementById('spPagoStatus');
   statusBox.className = 'p-3 rounded-lg text-xs border bg-slate-950 text-slate-400 border-slate-700';
@@ -116,7 +226,7 @@ async function runRegistrarPago(e) {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        idSocioMembresia: parseInt(contratoId),
+        idSocioMembresia: contratoId,
         monto: monto,
         fechaPago: fecha ? new Date(fecha).toISOString() : null
       })
@@ -126,11 +236,11 @@ async function runRegistrarPago(e) {
 
     if (!res.ok) {
       statusBox.className = 'p-3 rounded-lg text-xs border bg-rose-950/60 border-rose-600 text-rose-200';
-      statusBox.innerHTML = `<strong>Error al procesar:</strong><br>${escapeHtml(data.message || 'Error desconocido')}`;
+      statusBox.innerHTML = `<strong>Error al procesar:</strong><br>${escapeHtml(data.message || data.detail || 'Error desconocido')}`;
       return;
     }
 
-    const socioLabel = document.getElementById('spContratoSelect')?.selectedOptions[0]?.text || 'Socio';
+    const socioLabel = contrato ? `${contrato.socio} (${contrato.planContratado})` : 'Socio';
     statusBox.className = 'p-3 rounded-lg text-xs border bg-emerald-950/60 border-emerald-600 text-emerald-200';
     statusBox.innerHTML = `
       <div class="flex items-center justify-between gap-2">
@@ -146,11 +256,79 @@ async function runRegistrarPago(e) {
     
     if (window.lucide) lucide.createIcons();
 
-    loadContratosVigentes();
-    loadCatalogs();
+    await Promise.all([
+      loadContratosVigentes(),
+      loadCatalogs(),
+      loadHistorialPagos()
+    ]);
   } catch (err) {
     statusBox.className = 'p-3 rounded-lg text-xs border bg-rose-950/60 border-rose-600 text-rose-200';
     statusBox.innerHTML = `<strong>Fallo de conexión:</strong> ${err.message}`;
+  }
+}
+
+async function loadHistorialPagos() {
+  const tbody = document.getElementById('pagosTableBody');
+  if (!tbody) return;
+
+  try {
+    const res = await fetch('/api/operaciones/pagos?limit=50');
+    const pagos = await res.json();
+
+    if (!pagos || pagos.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="6" class="p-4 text-center text-slate-500">No se registran cobros en caja recientemente.</td></tr>';
+      return;
+    }
+
+    tbody.innerHTML = pagos.map(p => `
+      <tr class="hover:bg-slate-800/40">
+        <td class="p-2.5 font-mono text-indigo-400 font-semibold">REC-${p.idPago}</td>
+        <td class="p-2.5 font-medium text-white">${escapeHtml(p.socio)}</td>
+        <td class="p-2.5 text-slate-300">${escapeHtml(p.planContratado)}</td>
+        <td class="p-2.5 text-slate-400 font-mono text-[11px]">${formatDateTime(p.fechaPago)}</td>
+        <td class="p-2.5 text-right font-mono font-bold text-emerald-400">${formatCurrency(p.monto)}</td>
+        <td class="p-2.5 text-center">
+          <div class="flex items-center justify-center gap-1.5">
+            <button onclick="mostrarComprobantePago('REC-${p.idPago}', '${p.fechaPago}', '${escapeHtml(p.socio)}', '${escapeHtml(p.planContratado)}', ${p.monto})" class="p-1 hover:bg-slate-800 text-slate-400 hover:text-indigo-300 rounded transition" title="Ver e imprimir recibo">
+              <i data-lucide="printer" class="w-3.5 h-3.5"></i>
+            </button>
+            <button onclick="anularPago(${p.idPago}, ${p.monto}, '${escapeHtml(p.socio)}')" class="p-1 hover:bg-rose-500/10 text-slate-400 hover:text-rose-400 rounded transition" title="Anular comprobante por error">
+              <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+            </button>
+          </div>
+        </td>
+      </tr>
+    `).join('');
+
+    if (window.lucide) lucide.createIcons();
+  } catch (err) {
+    console.error('Error cargando historial de pagos:', err);
+    tbody.innerHTML = `<tr><td colspan="6" class="p-4 text-center text-rose-400">${err.message}</td></tr>`;
+  }
+}
+
+async function anularPago(idPago, monto, socio) {
+  if (!confirm(`¿Estás seguro de ANULAR y eliminar el comprobante #REC-${idPago} por ${formatCurrency(monto)} a nombre de ${socio}?\n\nEsta acción eliminará el registro de caja y restaurará el saldo adeudado del socio.`)) {
+    return;
+  }
+
+  try {
+    const res = await fetch(`/api/operaciones/pagos/${idPago}`, { method: 'DELETE' });
+    const data = await res.json();
+    if (!res.ok) {
+      alert(`Error al anular cobro: ${data.message || data.detail}`);
+      return;
+    }
+
+    alert(data.message || 'Comprobante anulado exitosamente.');
+    await Promise.all([
+      loadHistorialPagos(),
+      loadContratosVigentes(),
+      loadCatalogs()
+    ]);
+    if (currentSubTab === 'caja') loadRecaudacionMensual();
+  } catch (err) {
+    alert(`Error de red: ${err.message}`);
   }
 }
 
@@ -392,6 +570,7 @@ async function loadCatalogs() {
 
     const socios = await sociosRes.json();
     const contratos = await contratosRes.json();
+    contratosCache = contratos || [];
 
     const spSocioSelect = document.getElementById('spSocioSelect');
     const triggerSocioSelect = document.getElementById('triggerSocioSelect');
@@ -405,13 +584,22 @@ async function loadCatalogs() {
 
     const contratoSelect = document.getElementById('spContratoSelect');
     if (contratoSelect) {
-      contratoSelect.innerHTML = contratos.map(c => 
-        `<option value="${c.idSocioMembresia}">Contrato #${c.idSocioMembresia} - ${escapeHtml(c.socio)} (${escapeHtml(c.planContratado)}: ${formatCurrency(c.precioPlan)})</option>`
-      ).join('');
+      const prevVal = contratoSelect.value;
+      contratoSelect.innerHTML = '<option value="">-- Seleccionar Contrato a Cobrar --</option>' +
+        contratos.map(c => {
+          const saldo = formatCurrency(c.saldoPendiente);
+          const estado = c.estadoPago ? c.estadoPago.toUpperCase() : 'ACTIVO';
+          return `<option value="${c.idSocioMembresia}">Contrato #${c.idSocioMembresia} - ${escapeHtml(c.socio)} | ${escapeHtml(c.planContratado)} (Saldo: ${saldo} - [${estado}])</option>`;
+        }).join('');
 
-      if (contratos.length > 0) {
-        document.getElementById('spPagoMonto').value = contratos[0].precioPlan;
+      if (prevVal && contratos.some(c => c.idSocioMembresia === parseInt(prevVal))) {
+        contratoSelect.value = prevVal;
+      } else if (contratos.length > 0) {
+        // Seleccionar por defecto el primero que tenga saldo pendiente
+        const conDeuda = contratos.find(c => c.saldoPendiente > 0);
+        contratoSelect.value = conDeuda ? conDeuda.idSocioMembresia : contratos[0].idSocioMembresia;
       }
+      onSelectContratoCobro();
     }
 
     loadClasesCatalog();

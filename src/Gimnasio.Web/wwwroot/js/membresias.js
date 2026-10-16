@@ -363,18 +363,25 @@ async function cargarContratos() {
           </td>
           <td class="px-4 py-3 text-right">
             <div class="font-bold text-white font-mono">${formatCurrency(item.totalPagado)}</div>
-            <div class="text-[10px] text-slate-500">${item.cantidadPagos} pago(s) registrado(s)</div>
+            <div class="text-[10px] ${item.saldoPendiente > 0 ? 'text-amber-400 font-semibold' : 'text-slate-500'}">Saldo: ${formatCurrency(item.saldoPendiente)}</div>
+            <div class="text-[10px] text-slate-500">${item.cantidadPagos} cobro(s)</div>
           </td>
           <td class="px-4 py-3 text-center">
             <div class="flex items-center justify-center gap-1.5">
               <button onclick="toggleActivaContrato(${item.idSocioMembresia}, ${item.activa})" 
-                class="px-2.5 py-1 text-[11px] font-medium rounded border ${toggleActionClass} transition">
+                class="px-2 py-1 text-[11px] font-medium rounded border ${toggleActionClass} transition"
+                title="${item.activa ? 'Pausar membresía' : 'Reactivar membresía'}">
                 ${toggleActionLabel}
               </button>
-              <a href="/operaciones" title="Registrar Cobro" 
+              <a href="/operaciones" title="Registrar Cobro en Caja" 
                 class="px-2 py-1 text-[11px] font-medium rounded border border-indigo-500/30 text-indigo-300 hover:bg-indigo-500/20 transition flex items-center gap-1">
                 <i data-lucide="receipt" class="w-3.5 h-3.5"></i> Cobros
               </a>
+              <button onclick="eliminarContrato(${item.idSocioMembresia}, '${escapeHtml(item.nombreSocio)} ${escapeHtml(item.apellidoSocio)}', '${escapeHtml(item.nombreMembresia)}')" 
+                class="p-1 text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 rounded border border-transparent hover:border-rose-500/30 transition" 
+                title="Eliminar permanentemente este contrato">
+                <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+              </button>
             </div>
           </td>
         </tr>
@@ -409,6 +416,27 @@ async function toggleActivaContrato(idSocioMembresia, estadoActual) {
       return;
     }
     showAlert('success', data.message);
+    await cargarContratos();
+  } catch (err) {
+    showAlert('danger', `Error de red: ${err.message}`);
+  }
+}
+
+// Eliminar permanentemente un contrato erróneo y sus pagos
+async function eliminarContrato(idSocioMembresia, socioNombre, planNombre) {
+  if (!confirm(`¿Estás seguro de ELIMINAR permanentemente el contrato #${idSocioMembresia} de ${socioNombre} (${planNombre})?\n\nSi posee pagos o recibos asociados, se eliminarán en conjunto para revertir la asignación errónea.`)) {
+    return;
+  }
+
+  try {
+    const res = await fetch(`/api/membresias/contratos/${idSocioMembresia}`, { method: 'DELETE' });
+    const data = await res.json();
+    if (!res.ok) {
+      showAlert('danger', data.message || data.detail || 'Error al eliminar el contrato.');
+      return;
+    }
+
+    showAlert('success', data.message || `Contrato #${idSocioMembresia} eliminado exitosamente.`);
     await cargarContratos();
   } catch (err) {
     showAlert('danger', `Error de red: ${err.message}`);

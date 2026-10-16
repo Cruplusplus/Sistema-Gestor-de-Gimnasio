@@ -75,6 +75,28 @@ public static class GimnasioEndpoints
             });
         });
 
+        group.MapGet("/operaciones/pagos", async (
+            [FromQuery] int? limit,
+            IGimnasioRepository repo,
+            CancellationToken ct) =>
+        {
+            var list = await repo.GetPagosRecientesAsync(limit ?? 50, ct);
+            return Results.Ok(list);
+        });
+
+        group.MapDelete("/operaciones/pagos/{id:long}", async (
+            long id,
+            IGimnasioRepository repo,
+            CancellationToken ct) =>
+        {
+            await repo.EliminarPagoAsync(id, ct);
+            return Results.Ok(new
+            {
+                idPago = id,
+                message = $"Comprobante de cobro #{id} anulado y eliminado exitosamente del sistema."
+            });
+        });
+
         // Laboratorio de Triggers (Cupos de Clases)
         group.MapGet("/triggers/inscripciones", async (IGimnasioRepository repo, CancellationToken ct) =>
         {
@@ -325,6 +347,19 @@ public static class GimnasioEndpoints
                 idSocioMembresia = id,
                 activa = nuevaActiva,
                 message = nuevaActiva ? "Membresía del socio reactivada exitosamente." : "Membresía pausada/dada de baja exitosamente."
+            });
+        });
+
+        group.MapDelete("/membresias/contratos/{id:long}", async (
+            long id,
+            IGimnasioRepository repo,
+            CancellationToken ct) =>
+        {
+            await repo.EliminarSocioMembresiaAsync(id, ct);
+            return Results.Ok(new
+            {
+                idSocioMembresia = id,
+                message = $"Contrato de membresía #{id} y sus cobros asociados eliminados correctamente."
             });
         });
 

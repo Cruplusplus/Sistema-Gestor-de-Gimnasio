@@ -52,4 +52,13 @@
   - **Fase 2 (Backend & Estándares):** Actualización de paquetes para 0 warnings de compilación, implementación de `GlobalExceptionHandler` (RFC 7807 `ProblemDetails`), validaciones declarativas con `FluentValidation`, especificación OpenAPI y documentación interactiva con `Scalar` en `/scalar/v1`.
   - **Fase 3 (Testing & CI):** Creación de proyecto `tests/Gimnasio.Tests` con xUnit, FluentAssertions y `WebApplicationFactory` (19 pruebas automatizadas pasando al 100%) y pipeline de CI en GitHub Actions (`.github/workflows/ci.yml`).
   - **Fase 4 (Completitud Comercial):** Alta y cancelación de clases en cronograma (`/operaciones`), creación de planes comerciales y ajuste dinámico de tarifas (`/membresias`), y emisión de comprobante digital imprimible de cobro en caja.
+- **Versión 2.1 (Completada - Gestión Integral de Pagos y Reversión de Operaciones Erróneas):**
+  - **Anulación de Pagos Erróneos:** Nuevo endpoint `DELETE /api/operaciones/pagos/{id}` y `GET /api/operaciones/pagos`. Permite al personal de caja anular comprobantes erróneos en cualquier momento, revirtiendo el saldo en el contrato del socio.
+  - **Eliminación Definitiva de Membresías Erróneas:** Nuevo endpoint `DELETE /api/membresias/contratos/{id}` con transacción atómica en SQL Server que elimina el contrato y sus cobros asociados en cascada para corregir cargas erróneas.
+  - **Control de Saldos y Estados de Cobro en Operaciones:**
+    - Indicador de estado de pago en tiempo real (`Pagada`, `Parcial`, `Impaga`) con desglose de arancel, total pagado y saldo pendiente tanto en la tabla de pases activos como en el selector de caja.
+    - Autocompletado del monto a cobrar según el saldo adeudado exacto y advertencias ante cobros a contratos ya saldados al 100%.
+    - Botón de cobro rápido en la tabla que prepara la transacción con un solo clic.
+    - Tabla visual de últimos cobros en caja con reimpresión de comprobante y anulación segura.
+  - **Testing:** 25 pruebas unitarias y de integración automáticas pasando al 100% con xUnit y FluentAssertions.
 

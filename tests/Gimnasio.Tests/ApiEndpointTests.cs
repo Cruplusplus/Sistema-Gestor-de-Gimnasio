@@ -92,4 +92,29 @@ public class ApiEndpointTests : IClassFixture<WebApplicationFactory<Program>>
         var body = await response.Content.ReadAsStringAsync();
         body.Should().Contain("El cupo máximo de alumnos debe ser superior a cero.");
     }
+
+    [Fact]
+    public async Task GetPagosRecientes_DebeRetornarHttp200()
+    {
+        var response = await _client.GetAsync("/api/operaciones/pagos?limit=10");
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        response.Content.Headers.ContentType?.MediaType.Should().Be("application/json");
+    }
+
+    [Fact]
+    public async Task DeletePago_ConIdInexistente_DebeRetornarNotFound()
+    {
+        var response = await _client.DeleteAsync("/api/operaciones/pagos/9999999");
+
+        response.StatusCode.Should().Be(HttpStatusCode.NotFound);
+    }
+
+    [Fact]
+    public async Task DeleteContrato_ConIdInexistente_DebeRetornarNotFound()
+    {
+        var response = await _client.DeleteAsync("/api/membresias/contratos/9999999");
+
+        response.StatusCode.Should().Be(HttpStatusCode.NotFound);
+    }
 }
