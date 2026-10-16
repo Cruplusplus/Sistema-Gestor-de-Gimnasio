@@ -8,6 +8,7 @@ function renderSharedHeader(activePage) {
   const navItems = [
     { id: 'dashboard', label: 'Panel General', icon: 'layout-dashboard', href: '/' },
     { id: 'personas', label: 'Gestión de Personas', icon: 'users', href: '/personas' },
+    { id: 'membresias', label: 'Membresías de Socios', icon: 'id-card', href: '/membresias' },
     { id: 'operaciones', label: 'Operaciones & Clases', icon: 'credit-card', href: '/operaciones' },
     { id: 'studio', label: 'SQL Studio & Tablas', icon: 'terminal', href: '/studio' }
   ];

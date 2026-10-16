@@ -249,6 +249,72 @@ public static class GimnasioEndpoints
             }
         });
 
+        // Membresías y Contratos de Socios
+        group.MapGet("/membresias/planes", async (IGimnasioRepository repo, CancellationToken ct) =>
+        {
+            var planes = await repo.GetPlanesMembresiaAsync(ct);
+            return Results.Ok(planes);
+        });
+
+        group.MapGet("/membresias/contratos", async (
+            [FromQuery] string? busqueda,
+            [FromQuery] bool? soloActivas,
+            IGimnasioRepository repo,
+            CancellationToken ct) =>
+        {
+            var contratos = await repo.GetContratosMembresiasAsync(busqueda, soloActivas ?? false, ct);
+            return Results.Ok(contratos);
+        });
+
+        group.MapPost("/membresias/contratos", async (
+            [FromBody] RegistrarSocioMembresiaRequest request,
+            IGimnasioRepository repo,
+            CancellationToken ct) =>
+        {
+            try
+            {
+                long idSocioMembresia = await repo.RegistrarSocioMembresiaAsync(request, ct);
+                return Results.Ok(new
+                {
+                    idSocioMembresia,
+                    message = "Membresía asignada y registrada correctamente al socio."
+                });
+            }
+            catch (ArgumentException ex)
+            {
+                return Results.BadRequest(new { message = ex.Message });
+            }
+            catch (InvalidOperationException ex)
+            {
+                return Results.BadRequest(new { message = ex.Message });
+            }
+            catch (SqlException ex)
+            {
+                return Results.BadRequest(new { message = ex.Message, sqlErrorNumber = ex.Number });
+            }
+        });
+
+        group.MapPut("/membresias/contratos/{id:long}/toggle-activa", async (
+            long id,
+            IGimnasioRepository repo,
+            CancellationToken ct) =>
+        {
+            try
+            {
+                bool nuevaActiva = await repo.ToggleActivaSocioMembresiaAsync(id, ct);
+                return Results.Ok(new
+                {
+                    idSocioMembresia = id,
+                    activa = nuevaActiva,
+                    message = nuevaActiva ? "Membresía del socio reactivada exitosamente." : "Membresía pausada/dada de baja exitosamente."
+                });
+            }
+            catch (SqlException ex)
+            {
+                return Results.BadRequest(new { message = ex.Message });
+            }
+        });
+
         // Explorador de Tablas
         group.MapGet("/tablas", async (IGimnasioRepository repo, CancellationToken ct) =>
         {

@@ -151,3 +151,40 @@ public sealed record RolDto(
     int IDRol,
     string NombreRol
 );
+
+public sealed record MembresiaPlanDto(
+    int IDMembresia,
+    string Nombre,
+    decimal Precio,
+    int DuracionDias
+);
+
+public sealed record RegistrarSocioMembresiaRequest(
+    long IDSocio,
+    int IDMembresia,
+    DateTime FechaInicio,
+    DateTime? FechaFin,
+    bool? Activa,
+    bool? RegistrarPagoInicial,
+    decimal? MontoPagoInicial,
+    string? MetodoPagoInicial
+);
+
+public sealed record SocioMembresiaDetalleDto(
+    long IDSocioMembresia,
+    long IDSocio,
+    string NombreSocio,
+    string ApellidoSocio,
+    string EmailSocio,
+    int IDMembresia,
+    string NombreMembresia,
+    decimal PrecioPlan,
+    int DuracionDias,
+    DateTime FechaInicio,
+    DateTime FechaFin,
+    bool Activa,
+    int DiasRestantes,
+    int CantidadPagos,
+    decimal TotalPagado
+);
+

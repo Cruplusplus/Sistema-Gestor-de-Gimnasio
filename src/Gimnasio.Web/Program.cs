@@ -32,6 +32,8 @@ app.MapGimnasioEndpoints();
 // Rutas amigables para navegación limpia Multi-Page (URLs limpias sin .html)
 app.MapGet("/personas", (IWebHostEnvironment env) => 
     Results.File(Path.Combine(env.WebRootPath, "personas.html"), "text/html"));
+app.MapGet("/membresias", (IWebHostEnvironment env) => 
+    Results.File(Path.Combine(env.WebRootPath, "membresias.html"), "text/html"));
 app.MapGet("/operaciones", (IWebHostEnvironment env) => 
     Results.File(Path.Combine(env.WebRootPath, "operaciones.html"), "text/html"));
 app.MapGet("/studio", (IWebHostEnvironment env) => 

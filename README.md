@@ -75,9 +75,10 @@ El repositorio está modularizado en archivos independientes para facilitar el c
         └── 📁 wwwroot              # Frontend Multi-Page (Tailwind CSS, Lucide Icons, Vanilla JS)
             ├── 📄 index.html       # Panel General & KPIs ejecutivos
             ├── 📄 personas.html    # Directorio, Cargas y Bajas de Personas
+            ├── 📄 membresias.html  # Asignación y Control de Membresías de Socios
             ├── 📄 operaciones.html # Cobro de cuotas, Asistencias y Cronograma
             ├── 📄 studio.html      # SQL Studio Libre y Explorador de Tablas
-            └── 📁 js               # Lógica modular (shared, dashboard, personas, operaciones, studio)
+            └── 📁 js               # Lógica modular (shared, dashboard, personas, membresias, operaciones, studio)
 ```
 
 ---
@@ -100,6 +101,7 @@ La plataforma web fue diseñada con un enfoque comercial de **producto listo par
 4. **Arquitectura Multi-Página (MPA) con Enrutamiento Limpio:**
    - 📊 **Panel General (`/`):** Métricas comerciales en tiempo real (socios, staff, salones activos, contratos vigentes e ingresos totales), accesos rápidos y estado del servidor SQL.
    - 👥 **Gestión de Personas (`/personas`):** Directorio unificado con búsqueda y filtros por rol. Alta integral de personas con soporte de herencia (Socio, Staff con cargo, o ambos simultáneamente), baja lógica (desactivación/reactivación con suspensión de membresías) y baja física protegida con validación de movimientos históricos.
+   - 🪪 **Membresías de Socios (`/membresias`):** Catálogo interactivo de planes de membresía, asignación de contratos a socios con cálculo automático de vigencias, registro opcional de cobro inicial en un solo paso transaccional, control de estados (vigente, por vencer, vencido, pausado) y bajas lógicas.
    - 💳 **Operaciones & Clases (`/operaciones`):** Módulo para cobro de cuotas y contratos en caja, reserva de cupos en tiempo real para clases, historial cronológico de presentismo de alumnos y auditoría mensual de ingresos.
    - 💻 **SQL Studio & Tablas (`/studio`):** Consola para escribir y ejecutar consultas SQL libres con medición de latencia en milisegundos y exportación a CSV, junto a un explorador paginado para las 10 tablas físicas del modelo.
 
@@ -117,6 +119,7 @@ La plataforma web fue diseñada con un enfoque comercial de **producto listo par
 3. Abrir en el navegador:
    - Panel General: `http://localhost:5150/`
    - Gestión de Personas: `http://localhost:5150/personas`
+   - Membresías de Socios: `http://localhost:5150/membresias`
    - Operaciones & Clases: `http://localhost:5150/operaciones`
    - SQL Studio & Tablas: `http://localhost:5150/studio`
 

@@ -24,4 +24,8 @@ public interface IGimnasioRepository
     Task<bool> ToggleActivoPersonaAsync(long personaId, CancellationToken ct = default);
     Task EliminarPersonaAsync(long personaId, CancellationToken ct = default);
     Task<IEnumerable<RolDto>> GetRolesCatalogAsync(CancellationToken ct = default);
+    Task<IEnumerable<MembresiaPlanDto>> GetPlanesMembresiaAsync(CancellationToken ct = default);
+    Task<IEnumerable<SocioMembresiaDetalleDto>> GetContratosMembresiasAsync(string? busqueda = null, bool? soloActivas = null, CancellationToken ct = default);
+    Task<long> RegistrarSocioMembresiaAsync(RegistrarSocioMembresiaRequest request, CancellationToken ct = default);
+    Task<bool> ToggleActivaSocioMembresiaAsync(long socioMembresiaId, CancellationToken ct = default);
 }
