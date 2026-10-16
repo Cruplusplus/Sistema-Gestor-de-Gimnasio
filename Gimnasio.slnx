@@ -2,4 +2,7 @@
   <Folder Name="/src/">
     <Project Path="src/Gimnasio.Web/Gimnasio.Web.csproj" />
   </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Gimnasio.Tests/Gimnasio.Tests.csproj" />
+  </Folder>
 </Solution>

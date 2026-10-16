@@ -82,9 +82,14 @@ async function cargarPlanes() {
             <h4 class="font-bold text-white text-sm mb-1 group-hover:text-indigo-300 transition">${escapeHtml(p.nombre)}</h4>
             <div class="text-xl font-extrabold text-emerald-400 font-mono mb-2">${formatCurrency(p.precio)}</div>
           </div>
-          <button type="button" onclick="seleccionarPlanDirecto(${p.idMembresia})" class="w-full mt-3 flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-slate-800 hover:bg-indigo-600 text-slate-300 hover:text-white transition border border-slate-700 hover:border-indigo-500">
-            <i data-lucide="user-check" class="w-3.5 h-3.5"></i> Asignar a Socio
-          </button>
+          <div class="mt-3 flex items-center gap-1.5">
+            <button type="button" onclick="seleccionarPlanDirecto(${p.idMembresia})" class="flex-1 flex items-center justify-center gap-1.5 px-2.5 py-1.5 text-xs font-semibold rounded-lg bg-slate-800 hover:bg-indigo-600 text-slate-300 hover:text-white transition border border-slate-700 hover:border-indigo-500">
+              <i data-lucide="user-check" class="w-3.5 h-3.5"></i> Asignar
+            </button>
+            <button type="button" onclick="modificarPrecioPlan(${p.idMembresia}, '${escapeHtml(p.nombre)}', ${p.precio})" class="px-2.5 py-1.5 text-xs font-semibold rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-emerald-400 transition border border-slate-700" title="Ajustar Arancel / Tarifa">
+              <i data-lucide="edit-3" class="w-3.5 h-3.5"></i>
+            </button>
+          </div>
         </div>
       `).join('');
 
@@ -441,3 +446,85 @@ function hideAlert() {
   const container = document.getElementById('alertContainer');
   if (container) container.classList.add('hidden');
 }
+
+// Control del formulario de nuevo plan
+function toggleFormNuevoPlan(forceState) {
+  const container = document.getElementById('formNuevoPlanContainer');
+  const btnText = document.getElementById('btnTextNuevoPlan');
+  const isHidden = container.classList.contains('hidden');
+  const shouldOpen = forceState !== undefined ? forceState : isHidden;
+
+  if (shouldOpen) {
+    container.classList.remove('hidden');
+    btnText.textContent = 'Cerrar Formulario';
+    document.getElementById('nuevoPlanNombre').focus();
+  } else {
+    container.classList.add('hidden');
+    btnText.textContent = 'Nuevo Plan';
+  }
+  if (window.lucide) lucide.createIcons();
+}
+
+async function guardarNuevoPlan(e) {
+  e.preventDefault();
+  const nombre = document.getElementById('nuevoPlanNombre').value.trim();
+  const precio = parseFloat(document.getElementById('nuevoPlanPrecio').value);
+  const duracionDias = parseInt(document.getElementById('nuevoPlanDuracion').value);
+
+  const btn = document.getElementById('btnSubmitNuevoPlan');
+  btn.disabled = true;
+
+  try {
+    const res = await fetch('/api/membresias/planes', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ nombre, precio, duracionDias })
+    });
+
+    const data = await res.json();
+    if (!res.ok) {
+      showAlert('danger', data.message || data.detail || 'Error al crear el plan.');
+      return;
+    }
+
+    showAlert('success', data.message || 'Plan creado exitosamente.');
+    document.getElementById('formCrearPlan').reset();
+    toggleFormNuevoPlan(false);
+    await cargarPlanes();
+  } catch (err) {
+    showAlert('danger', `Error de red: ${err.message}`);
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+async function modificarPrecioPlan(idMembresia, nombre, precioActual) {
+  const nuevoPrecioStr = prompt(`Actualizar arancel comercial para "${nombre}":\nPrecio vigente: ${formatCurrency(precioActual)}\n\nIngresa el nuevo precio en $ ARS:`, precioActual);
+  if (!nuevoPrecioStr) return;
+
+  const nuevoPrecio = parseFloat(nuevoPrecioStr);
+  if (isNaN(nuevoPrecio) || nuevoPrecio <= 0) {
+    alert("El arancel ingresado debe ser un número positivo superior a cero.");
+    return;
+  }
+
+  try {
+    const res = await fetch(`/api/membresias/planes/${idMembresia}/precio`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ nuevoPrecio })
+    });
+
+    const data = await res.json();
+    if (!res.ok) {
+      showAlert('danger', data.message || data.detail || 'Error al actualizar tarifa.');
+      return;
+    }
+
+    showAlert('success', data.message || `Arancel de "${nombre}" actualizado a ${formatCurrency(nuevoPrecio)}.`);
+    await cargarPlanes();
+  } catch (err) {
+    showAlert('danger', `Error de red: ${err.message}`);
+  }
+}
+

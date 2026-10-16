@@ -1,0 +1,30 @@
+name: CI Build & Test
+
+on:
+  push:
+    branches: [ "**" ]
+  pull_request:
+    branches: [ "**" ]
+
+jobs:
+  build-and-test:
+    name: Build & Test .NET 10 Solution
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout Code
+      uses: actions/checkout@v4
+
+    - name: Setup .NET 10 SDK
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: '10.0.x'
+
+    - name: Restore Dependencies
+      run: dotnet restore Gimnasio.slnx
+
+    - name: Build Solution
+      run: dotnet build Gimnasio.slnx --no-restore --configuration Release
+
+    - name: Run Test Suite
+      run: dotnet test Gimnasio.slnx --no-build --configuration Release --verbosity normal

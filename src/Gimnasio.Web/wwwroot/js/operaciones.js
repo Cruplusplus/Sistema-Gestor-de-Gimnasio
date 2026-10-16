@@ -130,9 +130,22 @@ async function runRegistrarPago(e) {
       return;
     }
 
+    const socioLabel = document.getElementById('spContratoSelect')?.selectedOptions[0]?.text || 'Socio';
     statusBox.className = 'p-3 rounded-lg text-xs border bg-emerald-950/60 border-emerald-600 text-emerald-200';
-    statusBox.innerHTML = `<strong>¡Cobro registrado exitosamente!</strong><br>Monto abonado: ${formatCurrency(data.monto)}`;
+    statusBox.innerHTML = `
+      <div class="flex items-center justify-between gap-2">
+        <div>
+          <strong>¡Cobro registrado exitosamente!</strong><br>
+          Monto abonado: ${formatCurrency(data.monto)}
+        </div>
+        <button type="button" onclick="mostrarComprobantePago('REC-${data.contratoId}-${Date.now().toString().slice(-4)}', '${data.fecha}', '${escapeHtml(socioLabel)}', 'Cuota de Membresía', ${data.monto})" class="px-3 py-1 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-xs font-semibold flex items-center gap-1 shadow-sm transition">
+          <i data-lucide="printer" class="w-3.5 h-3.5"></i> Ver Recibo
+        </button>
+      </div>
+    `;
     
+    if (window.lucide) lucide.createIcons();
+
     loadContratosVigentes();
     loadCatalogs();
   } catch (err) {
@@ -238,9 +251,14 @@ async function loadClasesCatalog() {
           <div class="p-3 rounded-xl bg-slate-950 border ${isFull ? 'border-rose-500/50 bg-rose-950/10' : 'border-slate-800'} space-y-2">
             <div class="flex items-center justify-between">
               <span class="font-bold text-white text-xs">${escapeHtml(c.nombre)}</span>
-              <span class="text-[10px] font-mono px-2 py-0.5 rounded ${isFull ? 'bg-rose-500/20 text-rose-400 border border-rose-500/30' : 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'}">
-                ${isFull ? 'COMPLETO' : `${c.cupoDisponible} libres`}
-              </span>
+              <div class="flex items-center gap-1.5">
+                <span class="text-[10px] font-mono px-2 py-0.5 rounded ${isFull ? 'bg-rose-500/20 text-rose-400 border border-rose-500/30' : 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'}">
+                  ${isFull ? 'COMPLETO' : `${c.cupoDisponible} libres`}
+                </span>
+                <button type="button" onclick="eliminarClase(${c.idClase}, '${escapeHtml(c.nombre)}')" class="p-1 rounded text-slate-500 hover:text-rose-400 hover:bg-rose-500/10 transition" title="Cancelar / Eliminar clase">
+                  <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+                </button>
+              </div>
             </div>
             <div class="text-[11px] text-slate-400 flex justify-between">
               <span>${formatDateTime(c.horario)}</span>
@@ -252,6 +270,8 @@ async function loadClasesCatalog() {
           </div>
         `;
       }).join('');
+
+      if (window.lucide) lucide.createIcons();
     }
   } catch (err) {
     console.error(err);
@@ -399,4 +419,126 @@ async function loadCatalogs() {
   } catch (err) {
     console.error('Error cargando catálogos:', err);
   }
+}
+
+// 4. ALTA Y GESTIÓN DE CLASES
+function toggleFormNuevaClase(forceState) {
+  const container = document.getElementById('formNuevaClaseContainer');
+  const btnText = document.getElementById('btnTextNuevaClase');
+  const isHidden = container.classList.contains('hidden');
+  const shouldOpen = forceState !== undefined ? forceState : isHidden;
+
+  if (shouldOpen) {
+    container.classList.remove('hidden');
+    btnText.textContent = 'Cerrar Formulario';
+    loadProfesoresCatalog();
+    const now = new Date();
+    now.setHours(now.getHours() + 1);
+    now.setMinutes(0, 0, 0);
+    const localIso = new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+    const inputHorario = document.getElementById('nuevaClaseHorario');
+    if (inputHorario) inputHorario.value = localIso;
+    document.getElementById('nuevaClaseNombre').focus();
+  } else {
+    container.classList.add('hidden');
+    btnText.textContent = 'Nueva Clase';
+  }
+  if (window.lucide) lucide.createIcons();
+}
+
+async function loadProfesoresCatalog() {
+  const select = document.getElementById('nuevaClaseProfesor');
+  if (!select || select.children.length > 1) return;
+
+  try {
+    const res = await fetch('/api/catalogos/profesores');
+    const profesores = await res.json();
+    select.innerHTML = '<option value="">-- Seleccionar Profesor --</option>' +
+      profesores.map(p => `<option value="${p.idEmpleado}">${escapeHtml(p.nombreCompleto)} (${escapeHtml(p.rol)})</option>`).join('');
+  } catch (err) {
+    console.error('Error cargando profesores:', err);
+  }
+}
+
+async function guardarNuevaClase(e) {
+  e.preventDefault();
+  const nombre = document.getElementById('nuevaClaseNombre').value.trim();
+  const idProfesor = parseInt(document.getElementById('nuevaClaseProfesor').value);
+  const horario = document.getElementById('nuevaClaseHorario').value;
+  const cupoMaximo = parseInt(document.getElementById('nuevaClaseCupo').value);
+
+  const btn = document.getElementById('btnSubmitNuevaClase');
+  btn.disabled = true;
+
+  try {
+    const res = await fetch('/api/operaciones/clases', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        nombre,
+        idProfesor,
+        horario: new Date(horario).toISOString(),
+        cupoMaximo
+      })
+    });
+
+    const data = await res.json();
+    if (!res.ok) {
+      alert(`Error al crear la clase: ${data.message || data.detail || 'Verifica los campos'}`);
+      return;
+    }
+
+    alert(data.message || 'Clase creada exitosamente.');
+    document.getElementById('formCrearClase').reset();
+    toggleFormNuevaClase(false);
+    loadClasesCatalog();
+  } catch (err) {
+    alert(`Error de conexión: ${err.message}`);
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+async function eliminarClase(idClase, nombre) {
+  if (!confirm(`¿Estás seguro de que deseas cancelar la clase "${nombre}" (#${idClase})?\nSe eliminarán las reservas e inscripciones asociadas para liberar el cronograma.`)) {
+    return;
+  }
+
+  try {
+    const res = await fetch(`/api/operaciones/clases/${idClase}`, { method: 'DELETE' });
+    const data = await res.json();
+    if (!res.ok) {
+      alert(`Error al cancelar la clase: ${data.message || data.detail}`);
+      return;
+    }
+    alert(data.message || 'Clase cancelada exitosamente.');
+    loadClasesCatalog();
+    loadInscripcionesRecientes();
+  } catch (err) {
+    alert(`Error de red: ${err.message}`);
+  }
+}
+
+// 5. COMPROBANTE DIGITAL DE PAGO
+function mostrarComprobantePago(reciboNum, fecha, socioNombre, concepto, monto) {
+  const modal = document.getElementById('modalComprobantePago');
+  if (!modal) return;
+
+  document.getElementById('reciboNumero').textContent = reciboNum || 'REC-0001';
+  document.getElementById('reciboFecha').textContent = formatDateTime(fecha || new Date().toISOString());
+  document.getElementById('reciboSocio').textContent = socioNombre || 'Cliente Registrado';
+  document.getElementById('reciboConcepto').textContent = concepto || 'Cobro de Cuota / Membresía';
+  document.getElementById('reciboMonto').textContent = formatCurrency(monto || 0);
+
+  modal.classList.remove('hidden');
+  if (window.lucide) lucide.createIcons();
+}
+
+function cerrarModalComprobante() {
+  const modal = document.getElementById('modalComprobantePago');
+  if (modal) modal.classList.add('hidden');
+}
+
+function imprimirComprobante() {
+  window.print();
 }

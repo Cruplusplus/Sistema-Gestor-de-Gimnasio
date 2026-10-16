@@ -29,13 +29,54 @@
         <h2 class="text-xl font-bold text-white tracking-tight">Membresías y Contratos de Socios</h2>
         <p class="text-sm text-slate-400">Asignación de suscripciones, control de vigencias, pagos iniciales y bajas lógicas</p>
       </div>
-      <button onclick="toggleFormAsignacion()" id="btnToggleFormAsignacion" class="flex items-center gap-2 px-4 py-2 text-xs font-semibold rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white transition shadow-sm self-start sm:self-auto">
-        <i data-lucide="award" class="w-4 h-4"></i> <span id="btnToggleText">Asignar Membresía a Socio</span>
-      </button>
+      <div class="flex items-center gap-2 self-start sm:self-auto">
+        <button onclick="toggleFormNuevoPlan()" id="btnToggleNuevoPlan" class="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition shadow-sm">
+          <i data-lucide="plus-circle" class="w-4 h-4 text-emerald-400"></i> <span id="btnTextNuevoPlan">Nuevo Plan</span>
+        </button>
+        <button onclick="toggleFormAsignacion()" id="btnToggleFormAsignacion" class="flex items-center gap-1.5 px-4 py-2 text-xs font-semibold rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white transition shadow-sm">
+          <i data-lucide="award" class="w-4 h-4"></i> <span id="btnToggleText">Asignar a Socio</span>
+        </button>
+      </div>
     </div>
 
     <!-- Alert / Toast Container -->
     <div id="alertContainer" class="hidden"></div>
+
+    <!-- Collapsible Form: Nuevo Plan de Membresía -->
+    <div id="formNuevoPlanContainer" class="hidden bg-slate-900 border border-emerald-500/30 rounded-xl p-5 space-y-4 shadow-lg shadow-emerald-500/5">
+      <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+        <div>
+          <h3 class="font-bold text-white text-sm flex items-center gap-2">
+            <i data-lucide="plus-circle" class="w-4 h-4 text-emerald-400"></i> Alta de Nuevo Plan de Membresía
+          </h3>
+          <p class="text-xs text-slate-400 mt-0.5">Define las características, arancel comercial y duración nominal del nuevo plan.</p>
+        </div>
+        <button onclick="toggleFormNuevoPlan(false)" class="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800">
+          <i data-lucide="x" class="w-4 h-4"></i>
+        </button>
+      </div>
+
+      <form id="formCrearPlan" onsubmit="guardarNuevoPlan(event)" class="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
+        <div>
+          <label class="block text-slate-300 font-medium mb-1">Nombre del Plan *</label>
+          <input type="text" id="nuevoPlanNombre" required placeholder="Ej: Pase Full Matutino" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-slate-200 focus:outline-none focus:border-emerald-500">
+        </div>
+        <div>
+          <label class="block text-slate-300 font-medium mb-1">Arancel / Precio ($ ARS) *</label>
+          <input type="number" id="nuevoPlanPrecio" step="0.01" min="1" required placeholder="35000" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-slate-200 focus:outline-none focus:border-emerald-500 font-mono">
+        </div>
+        <div>
+          <label class="block text-slate-300 font-medium mb-1">Duración Nominal (Días) *</label>
+          <input type="number" id="nuevoPlanDuracion" min="1" max="1000" value="30" required class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-slate-200 focus:outline-none focus:border-emerald-500 font-mono">
+        </div>
+        <div class="sm:col-span-3 flex justify-end gap-2 pt-2 border-t border-slate-800">
+          <button type="button" onclick="toggleFormNuevoPlan(false)" class="px-3.5 py-2 text-slate-400 hover:text-white bg-slate-800 hover:bg-slate-700 rounded-lg transition">Cancelar</button>
+          <button type="submit" id="btnSubmitNuevoPlan" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-medium rounded-lg transition shadow-sm flex items-center gap-1.5">
+            <i data-lucide="check" class="w-4 h-4"></i> Crear Plan de Membresía
+          </button>
+        </div>
+      </form>
+    </div>
 
     <!-- Collapsible Registration Form -->
     <div id="formAsignacionContainer" class="hidden bg-slate-900 border border-indigo-500/30 rounded-xl p-5 space-y-4 shadow-lg shadow-indigo-500/5">

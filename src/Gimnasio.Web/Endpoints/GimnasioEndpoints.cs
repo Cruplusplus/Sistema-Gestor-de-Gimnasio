@@ -1,7 +1,7 @@
+using FluentValidation;
 using Gimnasio.Web.Data;
 using Gimnasio.Web.Models;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.Data.SqlClient;
 
 namespace Gimnasio.Web.Endpoints;
 
@@ -14,18 +14,11 @@ public static class GimnasioEndpoints
         // Dashboard & KPIs
         group.MapGet("/dashboard/stats", async (IGimnasioRepository repo, CancellationToken ct) =>
         {
-            try
-            {
-                var stats = await repo.GetDashboardStatsAsync(ct);
-                return Results.Ok(stats);
-            }
-            catch (SqlException ex)
-            {
-                return Results.Problem(detail: ex.Message, statusCode: 500, title: "Error al consultar SQL Server");
-            }
+            var stats = await repo.GetDashboardStatsAsync(ct);
+            return Results.Ok(stats);
         });
 
-        // 3 Vistas Complejas
+        // 3 Vistas Complejas (Requisitos UTN)
         group.MapGet("/vistas/socios-membresias-activas", async (IGimnasioRepository repo, CancellationToken ct) =>
         {
             var data = await repo.GetSociosMembresiasActivasAsync(ct);
@@ -61,30 +54,25 @@ public static class GimnasioEndpoints
 
         group.MapPost("/procedimientos/registrar-pago", async (
             [FromBody] RegistrarPagoRequest request,
+            IValidator<RegistrarPagoRequest> validator,
             IGimnasioRepository repo,
             CancellationToken ct) =>
         {
-            if (request.Monto <= 0)
+            var valResult = await validator.ValidateAsync(request, ct);
+            if (!valResult.IsValid)
             {
-                return Results.BadRequest(new { message = "El monto debe ser un valor positivo mayor a cero." });
+                return Results.ValidationProblem(valResult.ToDictionary());
             }
 
-            try
+            var fechaPago = request.FechaPago ?? DateTime.Now;
+            await repo.RegistrarPagoMembresiaAsync(request.IDSocioMembresia, request.Monto, fechaPago, ct);
+            return Results.Ok(new
             {
-                var fechaPago = request.FechaPago ?? DateTime.Now;
-                await repo.RegistrarPagoMembresiaAsync(request.IDSocioMembresia, request.Monto, fechaPago, ct);
-                return Results.Ok(new
-                {
-                    message = "Pago registrado exitosamente en la transacción de SQL Server.",
-                    contratoId = request.IDSocioMembresia,
-                    monto = request.Monto,
-                    fecha = fechaPago
-                });
-            }
-            catch (SqlException ex)
-            {
-                return Results.BadRequest(new { message = ex.Message, sqlErrorNumber = ex.Number });
-            }
+                message = "Pago registrado exitosamente en la transacción de SQL Server.",
+                contratoId = request.IDSocioMembresia,
+                monto = request.Monto,
+                fecha = fechaPago
+            });
         });
 
         // Laboratorio de Triggers (Cupos de Clases)
@@ -96,47 +84,35 @@ public static class GimnasioEndpoints
 
         group.MapPost("/triggers/inscribir", async (
             [FromBody] InscribirSocioRequest request,
+            IValidator<InscribirSocioRequest> validator,
             IGimnasioRepository repo,
             CancellationToken ct) =>
         {
-            try
+            var valResult = await validator.ValidateAsync(request, ct);
+            if (!valResult.IsValid)
             {
-                var fecha = request.FechaInscripcion ?? DateTime.Today;
-                long idInscripcion = await repo.InscribirSocioClaseAsync(request.IDSocio, request.IDClase, fecha, ct);
-                return Results.Ok(new
-                {
-                    idInscripcion,
-                    message = "Inscripción completada. El trigger 'trg_Inscripcion_ActualizarCupo' descontó 1 vacante automáticamente."
-                });
+                return Results.ValidationProblem(valResult.ToDictionary());
             }
-            catch (SqlException ex)
+
+            var fecha = request.FechaInscripcion ?? DateTime.Today;
+            long idInscripcion = await repo.InscribirSocioClaseAsync(request.IDSocio, request.IDClase, fecha, ct);
+            return Results.Ok(new
             {
-                // El trigger lanza RAISERROR si no hay cupo
-                return Results.BadRequest(new { message = ex.Message, sqlErrorNumber = ex.Number, triggerRolledBack = true });
-            }
+                idInscripcion,
+                message = "Inscripción completada. El trigger 'trg_Inscripcion_ActualizarCupo' descontó 1 vacante automáticamente."
+            });
         });
 
         group.MapDelete("/triggers/cancelar/{id:long}", async (long id, IGimnasioRepository repo, CancellationToken ct) =>
         {
-            try
+            await repo.CancelarInscripcionClaseAsync(id, ct);
+            return Results.Ok(new
             {
-                await repo.CancelarInscripcionClaseAsync(id, ct);
-                return Results.Ok(new
-                {
-                    message = $"Inscripción {id} cancelada. El trigger 'trg_Cancelacion_ActualizarCupo' restituyó 1 vacante a la clase."
-                });
-            }
-            catch (KeyNotFoundException ex)
-            {
-                return Results.NotFound(new { message = ex.Message });
-            }
-            catch (SqlException ex)
-            {
-                return Results.BadRequest(new { message = ex.Message });
-            }
+                message = $"Inscripción #{id} cancelada. El trigger 'trg_Cancelacion_ActualizarCupo' restituyó 1 vacante a la clase."
+            });
         });
 
-        // Catálogos para selectors en UI
+        // Catálogos auxiliares para selectores UI
         group.MapGet("/catalogos/socios", async (IGimnasioRepository repo, CancellationToken ct) =>
         {
             var socios = await repo.GetSociosCatalogAsync(ct);
@@ -149,6 +125,12 @@ public static class GimnasioEndpoints
             return Results.Ok(clases);
         });
 
+        group.MapGet("/catalogos/profesores", async (IGimnasioRepository repo, CancellationToken ct) =>
+        {
+            var profesores = await repo.GetProfesoresCatalogAsync(ct);
+            return Results.Ok(profesores);
+        });
+
         group.MapGet("/catalogos/contratos", async (IGimnasioRepository repo, CancellationToken ct) =>
         {
             var contratos = await repo.GetContratosCatalogAsync(ct);
@@ -159,6 +141,40 @@ public static class GimnasioEndpoints
         {
             var roles = await repo.GetRolesCatalogAsync(ct);
             return Results.Ok(roles);
+        });
+
+        // Gestión de Clases del Complejo
+        group.MapPost("/operaciones/clases", async (
+            [FromBody] CrearClaseRequest request,
+            IValidator<CrearClaseRequest> validator,
+            IGimnasioRepository repo,
+            CancellationToken ct) =>
+        {
+            var valResult = await validator.ValidateAsync(request, ct);
+            if (!valResult.IsValid)
+            {
+                return Results.ValidationProblem(valResult.ToDictionary());
+            }
+
+            long idClase = await repo.CrearClaseAsync(request, ct);
+            return Results.Ok(new
+            {
+                idClase,
+                message = $"Clase '{request.Nombre}' creada y agregada al cronograma exitosamente."
+            });
+        });
+
+        group.MapDelete("/operaciones/clases/{id:long}", async (
+            long id,
+            IGimnasioRepository repo,
+            CancellationToken ct) =>
+        {
+            await repo.EliminarClaseAsync(id, ct);
+            return Results.Ok(new
+            {
+                idClase = id,
+                message = "Clase cancelada y removida del cronograma."
+            });
         });
 
         // Gestión de Personas (Cargas y Bajas con Herencia)
@@ -174,30 +190,22 @@ public static class GimnasioEndpoints
 
         group.MapPost("/personas", async (
             [FromBody] CrearPersonaRequest request,
+            IValidator<CrearPersonaRequest> validator,
             IGimnasioRepository repo,
             CancellationToken ct) =>
         {
-            try
+            var valResult = await validator.ValidateAsync(request, ct);
+            if (!valResult.IsValid)
             {
-                long idPersona = await repo.CrearPersonaAsync(request, ct);
-                return Results.Ok(new
-                {
-                    idPersona,
-                    message = "Persona registrada exitosamente junto a sus clasificaciones."
-                });
+                return Results.ValidationProblem(valResult.ToDictionary());
             }
-            catch (ArgumentException ex)
+
+            long idPersona = await repo.CrearPersonaAsync(request, ct);
+            return Results.Ok(new
             {
-                return Results.BadRequest(new { message = ex.Message });
-            }
-            catch (InvalidOperationException ex)
-            {
-                return Results.BadRequest(new { message = ex.Message });
-            }
-            catch (SqlException ex)
-            {
-                return Results.BadRequest(new { message = ex.Message, sqlErrorNumber = ex.Number });
-            }
+                idPersona,
+                message = "Persona registrada exitosamente junto a sus clasificaciones."
+            });
         });
 
         group.MapPut("/personas/{id:long}/toggle-activo", async (
@@ -205,20 +213,13 @@ public static class GimnasioEndpoints
             IGimnasioRepository repo,
             CancellationToken ct) =>
         {
-            try
+            bool nuevoEstado = await repo.ToggleActivoPersonaAsync(id, ct);
+            return Results.Ok(new
             {
-                bool nuevoEstado = await repo.ToggleActivoPersonaAsync(id, ct);
-                return Results.Ok(new
-                {
-                    idPersona = id,
-                    activo = nuevoEstado,
-                    message = nuevoEstado ? "Persona reactivada exitosamente." : "Persona dada de baja lógica (inactiva)."
-                });
-            }
-            catch (SqlException ex)
-            {
-                return Results.BadRequest(new { message = ex.Message });
-            }
+                idPersona = id,
+                activo = nuevoEstado,
+                message = nuevoEstado ? "Persona reactivada exitosamente." : "Persona dada de baja lógica (inactiva)."
+            });
         });
 
         group.MapDelete("/personas/{id:long}", async (
@@ -226,27 +227,12 @@ public static class GimnasioEndpoints
             IGimnasioRepository repo,
             CancellationToken ct) =>
         {
-            try
+            await repo.EliminarPersonaAsync(id, ct);
+            return Results.Ok(new
             {
-                await repo.EliminarPersonaAsync(id, ct);
-                return Results.Ok(new
-                {
-                    idPersona = id,
-                    message = "Registro de la persona eliminado permanentemente del sistema."
-                });
-            }
-            catch (KeyNotFoundException ex)
-            {
-                return Results.NotFound(new { message = ex.Message });
-            }
-            catch (InvalidOperationException ex)
-            {
-                return Results.BadRequest(new { message = ex.Message });
-            }
-            catch (SqlException ex)
-            {
-                return Results.BadRequest(new { message = ex.Message });
-            }
+                idPersona = id,
+                message = "Registro de la persona eliminado permanentemente del sistema."
+            });
         });
 
         // Membresías y Contratos de Socios
@@ -256,42 +242,76 @@ public static class GimnasioEndpoints
             return Results.Ok(planes);
         });
 
+        group.MapPost("/membresias/planes", async (
+            [FromBody] CrearPlanMembresiaRequest request,
+            IValidator<CrearPlanMembresiaRequest> validator,
+            IGimnasioRepository repo,
+            CancellationToken ct) =>
+        {
+            var valResult = await validator.ValidateAsync(request, ct);
+            if (!valResult.IsValid)
+            {
+                return Results.ValidationProblem(valResult.ToDictionary());
+            }
+
+            long idPlan = await repo.CrearPlanMembresiaAsync(request, ct);
+            return Results.Ok(new
+            {
+                idPlan,
+                message = $"Plan de membresía '{request.Nombre}' creado exitosamente."
+            });
+        });
+
+        group.MapPut("/membresias/planes/{id:int}/precio", async (
+            int id,
+            [FromBody] ActualizarPrecioPlanRequest request,
+            IValidator<ActualizarPrecioPlanRequest> validator,
+            IGimnasioRepository repo,
+            CancellationToken ct) =>
+        {
+            var valResult = await validator.ValidateAsync(request, ct);
+            if (!valResult.IsValid)
+            {
+                return Results.ValidationProblem(valResult.ToDictionary());
+            }
+
+            await repo.ActualizarPrecioPlanAsync(id, request.NuevoPrecio, ct);
+            return Results.Ok(new
+            {
+                idPlan = id,
+                nuevoPrecio = request.NuevoPrecio,
+                message = "Arancel del plan de membresía actualizado con éxito."
+            });
+        });
+
         group.MapGet("/membresias/contratos", async (
             [FromQuery] string? busqueda,
             [FromQuery] bool? soloActivas,
             IGimnasioRepository repo,
             CancellationToken ct) =>
         {
-            var contratos = await repo.GetContratosMembresiasAsync(busqueda, soloActivas ?? false, ct);
+            var contratos = await repo.GetContratosMembresiasAsync(busqueda, soloActivas, ct);
             return Results.Ok(contratos);
         });
 
         group.MapPost("/membresias/contratos", async (
             [FromBody] RegistrarSocioMembresiaRequest request,
+            IValidator<RegistrarSocioMembresiaRequest> validator,
             IGimnasioRepository repo,
             CancellationToken ct) =>
         {
-            try
+            var valResult = await validator.ValidateAsync(request, ct);
+            if (!valResult.IsValid)
             {
-                long idSocioMembresia = await repo.RegistrarSocioMembresiaAsync(request, ct);
-                return Results.Ok(new
-                {
-                    idSocioMembresia,
-                    message = "Membresía asignada y registrada correctamente al socio."
-                });
+                return Results.ValidationProblem(valResult.ToDictionary());
             }
-            catch (ArgumentException ex)
+
+            long idSocioMembresia = await repo.RegistrarSocioMembresiaAsync(request, ct);
+            return Results.Ok(new
             {
-                return Results.BadRequest(new { message = ex.Message });
-            }
-            catch (InvalidOperationException ex)
-            {
-                return Results.BadRequest(new { message = ex.Message });
-            }
-            catch (SqlException ex)
-            {
-                return Results.BadRequest(new { message = ex.Message, sqlErrorNumber = ex.Number });
-            }
+                idSocioMembresia,
+                message = "Membresía asignada y registrada correctamente al socio."
+            });
         });
 
         group.MapPut("/membresias/contratos/{id:long}/toggle-activa", async (
@@ -299,20 +319,13 @@ public static class GimnasioEndpoints
             IGimnasioRepository repo,
             CancellationToken ct) =>
         {
-            try
+            bool nuevaActiva = await repo.ToggleActivaSocioMembresiaAsync(id, ct);
+            return Results.Ok(new
             {
-                bool nuevaActiva = await repo.ToggleActivaSocioMembresiaAsync(id, ct);
-                return Results.Ok(new
-                {
-                    idSocioMembresia = id,
-                    activa = nuevaActiva,
-                    message = nuevaActiva ? "Membresía del socio reactivada exitosamente." : "Membresía pausada/dada de baja exitosamente."
-                });
-            }
-            catch (SqlException ex)
-            {
-                return Results.BadRequest(new { message = ex.Message });
-            }
+                idSocioMembresia = id,
+                activa = nuevaActiva,
+                message = nuevaActiva ? "Membresía del socio reactivada exitosamente." : "Membresía pausada/dada de baja exitosamente."
+            });
         });
 
         // Explorador de Tablas
@@ -329,19 +342,8 @@ public static class GimnasioEndpoints
             IGimnasioRepository repo,
             CancellationToken ct) =>
         {
-            try
-            {
-                var data = await repo.GetTableDataAsync(nombre, page <= 0 ? 1 : page, pageSize <= 0 ? 20 : pageSize, ct);
-                return Results.Ok(data);
-            }
-            catch (ArgumentException ex)
-            {
-                return Results.BadRequest(new { message = ex.Message });
-            }
-            catch (SqlException ex)
-            {
-                return Results.Problem(detail: ex.Message);
-            }
+            var data = await repo.GetTableDataAsync(nombre, page <= 0 ? 1 : page, pageSize <= 0 ? 20 : pageSize, ct);
+            return Results.Ok(data);
         });
 
         // Consola SQL Libre
@@ -355,26 +357,9 @@ public static class GimnasioEndpoints
                 return Results.BadRequest(new { message = "Debes ingresar una consulta SQL para ejecutar." });
             }
 
-            try
-            {
-                int maxRows = request.MaxRows ?? 200;
-                var result = await repo.ExecuteDynamicSqlAsync(request.Sql, maxRows, ct);
-                return Results.Ok(result);
-            }
-            catch (SqlException ex)
-            {
-                return Results.BadRequest(new
-                {
-                    message = ex.Message,
-                    lineNumber = ex.LineNumber,
-                    sqlErrorNumber = ex.Number,
-                    procedure = ex.Procedure
-                });
-            }
-            catch (Exception ex)
-            {
-                return Results.BadRequest(new { message = ex.Message });
-            }
+            int maxRows = request.MaxRows ?? 200;
+            var result = await repo.ExecuteDynamicSqlAsync(request.Sql, maxRows, ct);
+            return Results.Ok(result);
         });
 
         return group;

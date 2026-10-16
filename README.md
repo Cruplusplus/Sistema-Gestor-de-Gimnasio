@@ -25,10 +25,10 @@ El objetivo principal es resolver de forma centralizada y eficiente la problemá
 El sistema implementa una arquitectura relacional normalizada en **Tercera Forma Normal (3FN)**, aplicando las mejores prácticas recomendadas por la cátedra para el resguardo de la integridad referencial.
 
 ### Puntos Clave del Diseño Técnico
-1.  **Especialización de Entidades:** Se estructuró la tabla mestre `Personas` vinculada a las tablas dependientes `Socios` y `Empleados` mediante claves foráneas explícitas hacia `IDPersona`, rompiendo acoplamientos rígidos de uno a uno.
-2.  **Optimización de Tipos de Datos:** Se redujo el tamaño de almacenamiento en columnas del catálogo utilizando `INT` en `IDRol` e `IDMembresia` para optimizar los índices de búsqueda.
-3.  **Precisión Monetaria:** Todas las columnas referentes a flujos de caja y dinero (`Precio` en membresías y `Monto` en pagos) utilizan estrictamente el tipo de dato nativo `MONEY` de SQL Server.
-4.  **Claves e Índices lógicos:** Se utiliza una clave subrogada artificial (`IDSocioMembresia`) para agilizar los cruzamientos (`JOINs`), blindando la integridad comercial mediante un `CONSTRAINT UNIQUE` compuesto sobre `(IDSocio, IDMembresia, FechaInicio)` para impedir solapamientos.
+1. **Especialización de Entidades:** Se estructuró la tabla mestre `Personas` vinculada a las tablas dependientes `Socios` y `Empleados` mediante claves foráneas explícitas hacia `IDPersona`, rompiendo acoplamientos rígidos de uno a uno.
+2. **Optimización de Tipos de Datos:** Se redujo el tamaño de almacenamiento en columnas del catálogo utilizando `INT` en `IDRol` e `IDMembresia` para optimizar los índices de búsqueda.
+3. **Precisión Monetaria:** Todas las columnas referentes a flujos de caja y dinero (`Precio` en membresías y `Monto` en pagos) utilizan estrictamente el tipo de dato nativo `MONEY` de SQL Server.
+4. **Claves e Índices lógicos:** Se utiliza una clave subrogada artificial (`IDSocioMembresia`) para agilizar los cruzamientos (`JOINs`), blindando la integridad comercial mediante un `CONSTRAINT UNIQUE` compuesto sobre `(IDSocio, IDMembresia, FechaInicio)` para impedir solapamientos.
 
 ---
 
@@ -50,14 +50,20 @@ Para satisfacer la totalidad de los requisitos mínimos exigidos por la cátedra
 
 ---
 
-## Estructura de Scripts del Repositorio
-El repositorio está modularizado en archivos independientes para facilitar el control de versiones y evitar conflictos de mezcla (`merge conflicts`):
+## Estructura del Repositorio
+
+El proyecto cuenta con una arquitectura moderna de grado empresarial, desacoplada en backend, frontend, suite de pruebas automatizadas y despliegue por contenedores:
 
 ```text
 ├── 📄 README.md                    # Documentación y descripción del proyecto
 ├── 📄 agents.md                    # Directrices y convenciones para agentes de desarrollo
 ├── 📄 memory.md                    # Memoria operativa, arquitectura y estado del proyecto
-├── 📄 Gimnasio.slnx                # Solución C# .NET 10
+├── 📄 Gimnasio.slnx                # Solución C# .NET 10 (Web + Tests)
+├── 📄 docker-compose.yml           # Orquestación completa de SQL Server 2025 + Init DB + Web
+├── 📁 .github/workflows
+│   └── 📜 ci.yml                   # Pipeline de integración continua (CI) en GitHub Actions
+├── 📁 docker
+│   └── 📜 init-db.sh               # Script de auto-inicialización y carga secuencial de scripts
 ├── 📁 Creacion de la Base de Datos
 │   ├── 📜 Creacion de BBDD.sql     # Estructura de tablas y restricciones (DDL)
 │   ├── 📜 Insercion de Datos.sql   # Carga masiva de socios, empleados y clases (DML)
@@ -67,18 +73,25 @@ El repositorio está modularizado en archivos independientes para facilitar el c
 ├── 📁 Documentacion
 │   ├── 📄 TPI - Base de Datos II - Grupo 17.pdf
 │   └── 📄 TPI_Gimnasio_DER.png     # Diagrama de Entidad-Relación formal
-└── 📁 src
-    └── 📁 Gimnasio.Web             # Aplicación Web ASP.NET Core & Dapper
-        ├── 📁 Data                 # Factoría de conexiones y repositorios de alto rendimiento
-        ├── 📁 Endpoints            # Minimal APIs RESTful agrupadas
-        ├── 📁 Models               # Records y DTOs inmutables
-        └── 📁 wwwroot              # Frontend Multi-Page (Tailwind CSS, Lucide Icons, Vanilla JS)
-            ├── 📄 index.html       # Panel General & KPIs ejecutivos
-            ├── 📄 personas.html    # Directorio, Cargas y Bajas de Personas
-            ├── 📄 membresias.html  # Asignación y Control de Membresías de Socios
-            ├── 📄 operaciones.html # Cobro de cuotas, Asistencias y Cronograma
-            ├── 📄 studio.html      # SQL Studio Libre y Explorador de Tablas
-            └── 📁 js               # Lógica modular (shared, dashboard, personas, membresias, operaciones, studio)
+├── 📁 src
+│   └── 📁 Gimnasio.Web             # Aplicación Web ASP.NET Core & Dapper
+│       ├── 📄 Dockerfile           # Imagen multi-stage optimizada para producción
+│       ├── 📁 Data                 # Factoría de conexiones y repositorios de alto rendimiento
+│       ├── 📁 Endpoints            # Minimal APIs RESTful organizadas por dominio
+│       ├── 📁 Infrastructure       # Global Exception Handler (RFC 7807 ProblemDetails)
+│       ├── 📁 Models               # Records inmutables y DTOs
+│       ├── 📁 Validators           # Validadores declarativos con FluentValidation
+│       └── 📁 wwwroot              # Frontend Multi-Page (Tailwind CSS, Lucide Icons, Vanilla JS)
+│           ├── 📄 index.html       # Panel General & KPIs ejecutivos
+│           ├── 📄 personas.html    # Directorio, Cargas y Bajas de Personas
+│           ├── 📄 membresias.html  # Asignación y Control de Membresías de Socios
+│           ├── 📄 operaciones.html # Cobro de cuotas, Clases, Cupos y Cronograma
+│           ├── 📄 studio.html      # SQL Studio Libre y Explorador de Tablas
+│           └── 📁 js               # Controladores modulares por vista
+└── 📁 tests
+    └── 📁 Gimnasio.Tests           # Suite automatizada (xUnit, FluentAssertions, WebApplicationFactory)
+        ├── 📜 ValidationTests.cs   # Pruebas unitarias de reglas de negocio
+        └── 📜 ApiEndpointTests.cs  # Pruebas de integración HTTP y documentación
 ```
 
 ---
@@ -92,29 +105,42 @@ La plataforma web fue diseñada con un enfoque comercial de **producto listo par
 1. **Acceso a Datos de Ultra-Alto Rendimiento:**
    - **Micro-ORM Dapper + ADO.NET (`Microsoft.Data.SqlClient`)**: Conexiones asincrónicas no bloqueantes (`await using`, `IAsyncDisposable`), consultas parametrizadas contra SQL Injection y mapeo directo a memoria a velocidad de metal, evitando la sobrecarga de un ORM pesado.
    - **Patrón Factory (`IDbConnectionFactory`)**: Desacopla la creación de conexiones y optimiza el connection pooling nativo de SQL Server vía Inyección de Dependencias.
-2. **C# Moderno (C# 12 / 13 en .NET 10):**
-   - **Records inmutables** para DTOs de entrada y salida (`PersonaListItemDto`, `CrearPersonaRequest`, `SocioMembresiaActivaDto`, `OcupacionClaseDto`, etc.).
+2. **C# Moderno (C# 13 en .NET 10):**
+   - **Records inmutables** para DTOs de entrada y salida (`PersonaListItemDto`, `CrearPersonaRequest`, `SocioMembresiaDetalleDto`, etc.).
    - **Primary Constructors** y **Collection Expressions**.
-   - **Minimal APIs** organizadas por dominios lógicos con `MapGroup("/api")` y Typed Results (`Results.Ok`, `Results.BadRequest`, `Results.Problem`).
+   - **Minimal APIs** organizadas por dominios lógicos con `MapGroup("/api")` y Typed Results (`Results.Ok`, `Results.ValidationProblem`, `Results.Problem`).
+   - **Validación declarativa con FluentValidation**: Desacoplamiento de reglas de formato y lógica de negocio.
+   - **Global Exception Handling (`IExceptionHandler`)**: Captura centralizada de excepciones de SQL Server y del dominio traduciéndolas a especificación estándar RFC 7807 (`ProblemDetails`).
+   - **Documentación Interactiva con Scalar y OpenAPI**: Generación automática de especificación OpenAPI en `/openapi/v1.json` y visualizador de API en `/scalar/v1`.
 3. **Manejo Estructurado de Excepciones del Motor SQL:**
-   - Captura precisa de `SqlException`, identificando códigos de error y mensajes emitidos por `RAISERROR` en transacciones de cobro y triggers de cupos, protegiendo la base de datos y devolviendo mensajes claros y amigables al usuario.
+   - Captura precisa de `SqlException`, identificando códigos de error referencial (`2627`, `2601`), violación de checks y mensajes emitidos por `RAISERROR` en transacciones de cobro y triggers de cupos.
 4. **Arquitectura Multi-Página (MPA) con Enrutamiento Limpio:**
    - 📊 **Panel General (`/`):** Métricas comerciales en tiempo real (socios, staff, salones activos, contratos vigentes e ingresos totales), accesos rápidos y estado del servidor SQL.
    - 👥 **Gestión de Personas (`/personas`):** Directorio unificado con búsqueda y filtros por rol. Alta integral de personas con soporte de herencia (Socio, Staff con cargo, o ambos simultáneamente), baja lógica (desactivación/reactivación con suspensión de membresías) y baja física protegida con validación de movimientos históricos.
-   - 🪪 **Membresías de Socios (`/membresias`):** Catálogo interactivo de planes de membresía, asignación de contratos a socios con cálculo automático de vigencias, registro opcional de cobro inicial en un solo paso transaccional, control de estados (vigente, por vencer, vencido, pausado) y bajas lógicas.
-   - 💳 **Operaciones & Clases (`/operaciones`):** Módulo para cobro de cuotas y contratos en caja, reserva de cupos en tiempo real para clases, historial cronológico de presentismo de alumnos y auditoría mensual de ingresos.
+   - 🪪 **Membresías de Socios (`/membresias`):** Catálogo interactivo de planes de membresía, alta de nuevos planes comerciales, ajuste dinámico de tarifas/aranceles, asignación de contratos a socios con cálculo automático de vigencias, registro opcional de cobro inicial en un solo paso transaccional y control de estados (vigente, por vencer, vencido, pausado).
+   - 💳 **Operaciones & Clases (`/operaciones`):** Módulo para cobro de cuotas y contratos en caja con emisión de **comprobante digital imprimible**, alta y cancelación de clases en el cronograma con asignación de profesores del staff, reserva de cupos en tiempo real para alumnos, historial cronológico de presentismo y auditoría mensual de ingresos.
    - 💻 **SQL Studio & Tablas (`/studio`):** Consola para escribir y ejecutar consultas SQL libres con medición de latencia en milisegundos y exportación a CSV, junto a un explorador paginado para las 10 tablas físicas del modelo.
+   - 📖 **Scalar API Studio (`/scalar/v1`):** Documentación interactiva de la API para desarrolladores y consumo de terceros.
+
+---
 
 ### Cómo Ejecutar la Aplicación Web
 
-1. Asegúrate de tener el contenedor de SQL Server corriendo:
-   ```bash
-   docker ps
-   # Nombre: SQLServer2025, puerto mapeado: 1433
-   ```
-2. Iniciar el servidor web de .NET:
+#### Opción A: Despliegue Automatizado "Llave en Mano" (Recomendado)
+Levanta SQL Server 2025, ejecuta automáticamente todos los scripts de inicialización y arranca la Web App con un solo comando:
+```bash
+docker compose up -d --build
+```
+Una vez levantado, accede directamente a: `http://localhost:5150`
+
+#### Opción B: Ejecución Local en Desarrollo (.NET SDK 10)
+1. Iniciar el servidor web de .NET:
    ```bash
    dotnet run --project src/Gimnasio.Web --urls "http://localhost:5150"
+   ```
+2. Ejecutar la suite de pruebas automatizadas:
+   ```bash
+   dotnet test
    ```
 3. Abrir en el navegador:
    - Panel General: `http://localhost:5150/`
@@ -122,4 +148,4 @@ La plataforma web fue diseñada con un enfoque comercial de **producto listo par
    - Membresías de Socios: `http://localhost:5150/membresias`
    - Operaciones & Clases: `http://localhost:5150/operaciones`
    - SQL Studio & Tablas: `http://localhost:5150/studio`
-
+   - Documentación Scalar API: `http://localhost:5150/scalar/v1`

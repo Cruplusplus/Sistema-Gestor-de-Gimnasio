@@ -805,6 +805,111 @@ public sealed class GimnasioRepository(IDbConnectionFactory connectionFactory) :
 
         return await connection.ExecuteScalarAsync<bool>(new CommandDefinition(sql, new { Id = socioMembresiaId }, cancellationToken: ct));
     }
+
+    public async Task<long> CrearClaseAsync(CrearClaseRequest request, CancellationToken ct = default)
+    {
+        await using var connection = await connectionFactory.CreateOpenConnectionAsync(ct);
+        const string checkProfSql = "SELECT COUNT(1) FROM Empleados WHERE IDEmpleado = @IDProfesor;";
+        int exists = await connection.ExecuteScalarAsync<int>(new CommandDefinition(checkProfSql, new { request.IDProfesor }, cancellationToken: ct));
+        if (exists == 0)
+        {
+            throw new KeyNotFoundException($"El profesor/empleado #{request.IDProfesor} no existe.");
+        }
+
+        const string sql = """
+            INSERT INTO Clases (Nombre, Horario, CupoMaximo, CupoDisponible, IDProfesor)
+            OUTPUT INSERTED.IDClase
+            VALUES (@Nombre, @Horario, @CupoMaximo, @CupoMaximo, @IDProfesor);
+        """;
+
+        return await connection.ExecuteScalarAsync<long>(new CommandDefinition(sql, new
+        {
+            request.Nombre,
+            request.Horario,
+            request.CupoMaximo,
+            request.IDProfesor
+        }, cancellationToken: ct));
+    }
+
+    public async Task EliminarClaseAsync(long claseId, CancellationToken ct = default)
+    {
+        await using var connection = await connectionFactory.CreateOpenConnectionAsync(ct);
+        await using var transaction = await connection.BeginTransactionAsync(ct);
+        try
+        {
+            const string checkSql = "SELECT COUNT(1) FROM Clases WHERE IDClase = @Id;";
+            int exists = await connection.ExecuteScalarAsync<int>(new CommandDefinition(checkSql, new { Id = claseId }, (SqlTransaction)transaction, cancellationToken: ct));
+            if (exists == 0)
+            {
+                throw new KeyNotFoundException($"La clase #{claseId} no existe.");
+            }
+
+            // Eliminar dependencias en cascada para garantizar atomicidad
+            await connection.ExecuteAsync(new CommandDefinition("DELETE FROM HistorialAsistencias WHERE IDClase = @Id;", new { Id = claseId }, (SqlTransaction)transaction, cancellationToken: ct));
+            await connection.ExecuteAsync(new CommandDefinition("DELETE FROM InscripcionesClase WHERE IDClase = @Id;", new { Id = claseId }, (SqlTransaction)transaction, cancellationToken: ct));
+            await connection.ExecuteAsync(new CommandDefinition("DELETE FROM Clases WHERE IDClase = @Id;", new { Id = claseId }, (SqlTransaction)transaction, cancellationToken: ct));
+
+            await transaction.CommitAsync(ct);
+        }
+        catch
+        {
+            await transaction.RollbackAsync(ct);
+            throw;
+        }
+    }
+
+    public async Task<IEnumerable<ProfesorSelectItemDto>> GetProfesoresCatalogAsync(CancellationToken ct = default)
+    {
+        await using var connection = await connectionFactory.CreateOpenConnectionAsync(ct);
+        const string sql = """
+            SELECT 
+                e.IDEmpleado,
+                p.Nombre + ' ' + p.Apellido AS NombreCompleto,
+                ISNULL(r.NombreRol, 'Personal') AS Rol
+            FROM Empleados e
+            INNER JOIN Personas p ON e.IDPersona = p.IDPersona
+            LEFT JOIN Roles r ON e.IDRol = r.IDRol
+            WHERE p.Activo = 1
+            ORDER BY p.Apellido, p.Nombre;
+        """;
+        return await connection.QueryAsync<ProfesorSelectItemDto>(new CommandDefinition(sql, cancellationToken: ct));
+    }
+
+    public async Task<long> CrearPlanMembresiaAsync(CrearPlanMembresiaRequest request, CancellationToken ct = default)
+    {
+        await using var connection = await connectionFactory.CreateOpenConnectionAsync(ct);
+        const string sql = """
+            INSERT INTO Membresias (Nombre, Precio, DuracionDias)
+            OUTPUT INSERTED.IDMembresia
+            VALUES (@Nombre, @Precio, @DuracionDias);
+        """;
+        return await connection.ExecuteScalarAsync<long>(new CommandDefinition(sql, new
+        {
+            request.Nombre,
+            request.Precio,
+            request.DuracionDias
+        }, cancellationToken: ct));
+    }
+
+    public async Task ActualizarPrecioPlanAsync(int membresiaId, decimal nuevoPrecio, CancellationToken ct = default)
+    {
+        await using var connection = await connectionFactory.CreateOpenConnectionAsync(ct);
+        const string sql = """
+            UPDATE Membresias
+            SET Precio = @NuevoPrecio
+            WHERE IDMembresia = @Id;
+        """;
+        int affected = await connection.ExecuteAsync(new CommandDefinition(sql, new
+        {
+            Id = membresiaId,
+            NuevoPrecio = nuevoPrecio
+        }, cancellationToken: ct));
+
+        if (affected == 0)
+        {
+            throw new KeyNotFoundException($"El plan de membresía #{membresiaId} no existe.");
+        }
+    }
 }
 
 

@@ -188,3 +188,26 @@ public sealed record SocioMembresiaDetalleDto(
     decimal TotalPagado
 );
 
+public sealed record CrearClaseRequest(
+    string Nombre,
+    DateTime Horario,
+    int CupoMaximo,
+    long IDProfesor
+);
+
+public sealed record CrearPlanMembresiaRequest(
+    string Nombre,
+    decimal Precio,
+    int DuracionDias
+);
+
+public sealed record ActualizarPrecioPlanRequest(
+    decimal NuevoPrecio
+);
+
+public sealed record ProfesorSelectItemDto(
+    long IDEmpleado,
+    string NombreCompleto,
+    string Rol
+);
+
